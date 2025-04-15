@@ -101,7 +101,7 @@ export async function generateFirstQuestion(
         {
           role: "system",
           content:
-            "You are a medical assistant from OmniDoc conducting an initial patient screening. Keep your questions clear, concise, compassionate, and professional. Ask only one question at a time. Always introduce yourself as being from OmniDoc, never use '[Your Name]' or any placeholder in your introduction.",
+            "You are a medical assistant from OmniDoc conducting an initial patient screening. Keep your questions clear, concise, compassionate, and professional. Ask only one question at a time. Always introduce yourself as being from OmniDoc, never use '[Your Name]' or any placeholder in your introduction. Just refer to yourself as OmniDoc",
         },
         {
           role: "user",
@@ -111,9 +111,20 @@ export async function generateFirstQuestion(
       ],
     });
 
-    const question =
+    let question =
       response.choices[0].message.content ||
       "Hello, I'm a medical assistant from OmniDoc. I'm here to help with your medical screening. What brings you in today?";
+      
+    // Explicitly replace any instances of [Your Name] with OmniDoc
+    question = question.replace(/\[Your Name\]/g, "OmniDoc");
+    question = question.replace(/my name is \[.*?\]/gi, "I'm from OmniDoc");
+    question = question.replace(/I am \[.*?\]/gi, "I'm from OmniDoc");
+    question = question.replace(/I'm \[.*?\]/gi, "I'm from OmniDoc");
+    // Additional patterns we might see
+    question = question.replace(/called \[.*?\]/gi, "from OmniDoc");
+    question = question.replace(/My name is [a-zA-Z]+/gi, "I'm from OmniDoc");
+    question = question.replace(/I am [a-zA-Z]+/gi, "I'm from OmniDoc");
+    question = question.replace(/I'm [a-zA-Z]+/gi, "I'm from OmniDoc");
 
     session.nextQuestion = question;
     return question;
@@ -143,7 +154,7 @@ export async function processResponse(
       messages: [
         {
           role: "system",
-          content: `You are a medical assistant from OmniDoc extracting key information about a patient's ${session.currentField.replace("_", " ")}. 
+          content: `You are a medical assistant named OmniDoc extracting key information about a patient's ${session.currentField.replace("_", " ")}. 
           Provide a concise, professional summary of the key medical information in the patient's response.
           
           Important guidelines:
@@ -214,9 +225,20 @@ export async function processResponse(
       ],
     });
 
-    const nextQuestion =
+    let nextQuestion =
       nextQuestionResponse.choices[0].message.content ||
       `Could you tell me about your ${nextField.replace("_", " ")}?`;
+      
+    // Explicitly replace any instances of [Your Name] with OmniDoc
+    nextQuestion = nextQuestion.replace(/\[Your Name\]/g, "OmniDoc");
+    nextQuestion = nextQuestion.replace(/my name is \[.*?\]/gi, "I'm from OmniDoc");
+    nextQuestion = nextQuestion.replace(/I am \[.*?\]/gi, "I'm from OmniDoc");
+    nextQuestion = nextQuestion.replace(/I'm \[.*?\]/gi, "I'm from OmniDoc");
+    // Additional patterns we might see
+    nextQuestion = nextQuestion.replace(/called \[.*?\]/gi, "from OmniDoc");
+    nextQuestion = nextQuestion.replace(/My name is [a-zA-Z]+/gi, "I'm from OmniDoc");
+    nextQuestion = nextQuestion.replace(/I am [a-zA-Z]+/gi, "I'm from OmniDoc");
+    nextQuestion = nextQuestion.replace(/I'm [a-zA-Z]+/gi, "I'm from OmniDoc");
 
     session.nextQuestion = nextQuestion;
 
