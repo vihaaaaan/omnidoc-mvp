@@ -101,25 +101,25 @@ export async function generateFirstQuestion(
         {
           role: "system",
           content:
-            "You are a medical assistant conducting an initial patient screening. Keep your questions clear, concise, compassionate, and professional. Ask only one question at a time.",
+            "You are a medical assistant from OmniDoc conducting an initial patient screening. Keep your questions clear, concise, compassionate, and professional. Ask only one question at a time. Always introduce yourself as being from OmniDoc, never use '[Your Name]' or any placeholder in your introduction.",
         },
         {
           role: "user",
           content:
-            "Start the medical screening interview with an introduction and ask about the chief complaint.",
+            "Start the medical screening interview with an introduction that explicitly mentions you are from OmniDoc and ask about the chief complaint.",
         },
       ],
     });
 
     const question =
       response.choices[0].message.content ||
-      "Hello, I'm here to help with your medical screening. What brings you in today?";
+      "Hello, I'm a medical assistant from OmniDoc. I'm here to help with your medical screening. What brings you in today?";
 
     session.nextQuestion = question;
     return question;
   } catch (error) {
     console.error("Error generating first question:", error);
-    return "Hello, I'm here to help with your medical screening. What brings you in today?";
+    return "Hello, I'm a medical assistant from OmniDoc. I'm here to help with your medical screening. What brings you in today?";
   }
 }
 
@@ -143,7 +143,7 @@ export async function processResponse(
       messages: [
         {
           role: "system",
-          content: `You are a medical assistant extracting key information about a patient's ${session.currentField.replace("_", " ")}. 
+          content: `You are a medical assistant from OmniDoc extracting key information about a patient's ${session.currentField.replace("_", " ")}. 
           Provide a concise, professional summary of the key medical information in the patient's response.
           
           Important guidelines:
@@ -205,7 +205,7 @@ export async function processResponse(
         {
           role: "system",
           content:
-            "You are a medical assistant conducting a patient screening. Be concise, compassionate, and professional. Ask only one specific question.",
+            "You are a medical assistant from OmniDoc conducting a patient screening. Be concise, compassionate, and professional. Ask only one specific question.",
         },
         {
           role: "user",
@@ -259,7 +259,7 @@ export async function generateReport(
       messages: [
         {
           role: "system",
-          content: `You are a medical professional creating a concise summary report from patient screening data. 
+          content: `You are a medical professional at OmniDoc creating a concise summary report from patient screening data. 
           Provide a professional medical assessment based on the information provided.
           
           Important formatting guidelines:
