@@ -9,6 +9,7 @@ import {
   LogOut,
   X
 } from 'lucide-react';
+import omnidocLogo from '@/assets/omnidoc.png';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ const MobileSidebar = ({ isOpen, closeSidebar }: MobileSidebarProps) => {
         <div className="flex flex-col justify-between h-full">
           <div className="flex-grow">
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h1 className="text-lg font-bold text-primary-700">OmniDoc</h1>
+              <img src={omnidocLogo} alt="OmniDoc Logo" className="h-7" />
               <button onClick={closeSidebar}>
                 <X className="h-5 w-5" />
               </button>

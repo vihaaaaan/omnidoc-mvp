@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Menu, User } from 'lucide-react';
+import omnidocLogo from '@/assets/omnidoc.png';
 
 interface MobileHeaderProps {
   toggleSidebar: () => void;
@@ -12,7 +13,7 @@ const MobileHeader = ({ toggleSidebar }: MobileHeaderProps) => {
         <button onClick={toggleSidebar} className="p-2">
           <Menu className="h-6 w-6" />
         </button>
-        <h1 className="text-lg font-bold text-primary-700">OmniDoc</h1>
+        <img src={omnidocLogo} alt="OmniDoc Logo" className="h-7" />
       </div>
       <button>
         <User className="h-6 w-6" />
