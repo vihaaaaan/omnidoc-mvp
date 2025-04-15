@@ -32,14 +32,30 @@ const SessionLink = () => {
   // Check if voice service is available
   const [isVoiceServiceAvailable, setIsVoiceServiceAvailable] = useState(true);
   
+  // Determine voice service URL based on environment
+  const getVoiceServiceUrl = () => {
+    if (window.location.hostname === 'localhost') {
+      return 'http://localhost:5001';
+    } else {
+      // Use the same hostname but different port
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      return `${protocol}//${hostname}:5001`;
+    }
+  };
+  
+  const voiceServiceUrl = getVoiceServiceUrl();
+  console.log('Voice service URL:', voiceServiceUrl);
+  
   // Check voice service availability
   useEffect(() => {
     const checkVoiceService = async () => {
       try {
-        const response = await fetch('http://localhost:5001/api/get-schema/test', { 
+        const response = await fetch(`${voiceServiceUrl}/api/get-schema/test`, { 
           method: 'GET',
           signal: AbortSignal.timeout(3000), // 3 second timeout
         });
+        console.log('Voice service check response:', response.status);
         setIsVoiceServiceAvailable(response.ok);
       } catch (error) {
         console.error('Voice service unavailable:', error);
@@ -48,7 +64,7 @@ const SessionLink = () => {
     };
     
     checkVoiceService();
-  }, []);
+  }, [voiceServiceUrl]);
   
   // Start session mutation
   const startSessionMutation = useMutation({
@@ -63,7 +79,7 @@ const SessionLink = () => {
         };
       }
       
-      const response = await fetch(`http://localhost:5001/api/start-session/${sessionId}`, {
+      const response = await fetch(`${voiceServiceUrl}/api/start-session/${sessionId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,7 +162,7 @@ const SessionLink = () => {
       }
       
       // If voice service is available, use the actual API
-      const res = await fetch(`http://localhost:5001/api/process-response/${sessionId}`, {
+      const res = await fetch(`${voiceServiceUrl}/api/process-response/${sessionId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -306,7 +322,7 @@ const SessionLink = () => {
     
     // Try to use the voice service if it's available
     try {
-      const res = await fetch('http://localhost:5001/api/text-to-speech', {
+      const res = await fetch(`${voiceServiceUrl}/api/text-to-speech`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -318,7 +334,7 @@ const SessionLink = () => {
         throw new Error('Failed to convert text to speech');
       }
       
-      const audio = new Audio(`http://localhost:5001/temp_audio.wav`);
+      const audio = new Audio(`${voiceServiceUrl}/temp_audio.wav`);
       
       audio.onended = () => {
         setIsPlaying(false);
