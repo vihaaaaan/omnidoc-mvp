@@ -1,18 +1,46 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useParams, Link, useLocation } from 'wouter';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import SessionsList from '@/components/sessions/SessionsList';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, PlusCircle } from 'lucide-react';
-import { getPatientById, getSessionsWithReportsByPatientId } from '@/lib/supabase';
+import { ArrowLeft, Edit, PlusCircle, Loader2 } from 'lucide-react';
+import { getPatientById, getSessionsWithReportsByPatientId, createSession } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 import type { Patient, SessionWithReport } from '@/types';
 
 const PatientDetail = () => {
   const params = useParams();
   const { id } = params;
+  const [_, setLocation] = useLocation();
+  const { toast } = useToast();
   console.log('Patient detail page rendered with id:', id, 'params:', params);
+  
+  // Create new session mutation
+  const createSessionMutation = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('Patient ID is required');
+      return await createSession(id);
+    },
+    onSuccess: (session) => {
+      toast({
+        title: 'New Session Created',
+        description: 'Redirecting to interview page.',
+      });
+      
+      // Redirect to the session link page
+      setLocation(`/session/${session.id}`);
+    },
+    onError: (error) => {
+      console.error('Failed to create session:', error);
+      toast({
+        title: 'Error Creating Session',
+        description: (error as Error).message || 'Failed to create new session',
+        variant: 'destructive',
+      });
+    }
+  });
   
   // Fetch patient data
   const { 
@@ -77,9 +105,18 @@ const PatientDetail = () => {
               <Edit className="h-4 w-4 mr-2" />
               Edit Patient
             </Button>
-            <Button size="sm" className="bg-primary-600 hover:bg-primary-700 text-white">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Session
+            <Button 
+              size="sm" 
+              className="bg-primary-600 hover:bg-primary-700 text-white"
+              onClick={() => createSessionMutation.mutate()}
+              disabled={createSessionMutation.isPending}
+            >
+              {createSessionMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <PlusCircle className="h-4 w-4 mr-2" />
+              )}
+              {createSessionMutation.isPending ? 'Creating...' : 'New Session'}
             </Button>
           </div>
         )}

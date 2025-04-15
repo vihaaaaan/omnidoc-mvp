@@ -5,7 +5,11 @@ import { Loader2, Mic, MicOff, Play, Square, Send, RefreshCw } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { apiRequest, getQueryFn, queryClient } from '@/lib/queryClient';
-import { updateSessionStatus, createReport as createSupabaseReport } from '@/lib/supabase';
+import { 
+  updateSessionStatus, 
+  createReport as createSupabaseReport,
+  getSessionById
+} from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { Session } from '@/types';
 
@@ -182,10 +186,19 @@ const SessionLink = () => {
     }
   });
   
-  // Fetch session information to verify it exists
+  // Fetch session information to verify it exists using Supabase directly
   const { data: sessionData, isLoading: isSessionLoading } = useQuery<Session>({
-    queryKey: [`/api/sessions/${sessionId}`],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryKey: [`/sessions/${sessionId}`],
+    queryFn: async () => {
+      if (!sessionId) return null;
+      const session = await getSessionById(sessionId);
+      if (!session) {
+        console.warn(`Session ${sessionId} not found in database`);
+      } else {
+        console.log(`Found session in database:`, session);
+      }
+      return session;
+    },
     enabled: !!sessionId,
   });
   
@@ -205,14 +218,18 @@ const SessionLink = () => {
       
       // Update session status in Supabase
       try {
-        const updatedSession = await updateSessionStatus(sessionId, 'completed');
-        console.log('Session status updated to completed:', updatedSession);
+        if (typeof sessionId === 'string') {
+          const updatedSession = await updateSessionStatus(sessionId, 'completed');
+          console.log('Session status updated to completed:', updatedSession);
+        }
       } catch (error) {
         console.error('Error updating session status in Supabase:', error);
         // Fallback to API if Supabase update fails
-        await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
-          status: 'completed'
-        });
+        if (typeof sessionId === 'string') {
+          await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
+            status: 'completed'
+          });
+        }
       }
       
       // Convert schema to a summary
@@ -223,8 +240,10 @@ const SessionLink = () => {
       // Create report in Supabase
       let createdReport;
       try {
-        createdReport = await createSupabaseReport(sessionId, summary, schema);
-        console.log('Report created in Supabase successfully:', createdReport);
+        if (typeof sessionId === 'string') {
+          createdReport = await createSupabaseReport(sessionId, summary, schema);
+          console.log('Report created in Supabase successfully:', createdReport);
+        }
       } catch (supabaseError) {
         console.error('Error creating report in Supabase:', supabaseError);
         // Fallback to API if Supabase creation fails

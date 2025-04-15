@@ -53,6 +53,35 @@ export const getSessionsByPatientId = async (patientId: string) => {
   return data;
 };
 
+export const getSessionById = async (sessionId: string) => {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single();
+  
+  // If the error is "No rows found", just return null instead of throwing
+  if (error && error.code === 'PGRST116') return null;
+  if (error) throw error;
+  return data;
+};
+
+export const createSession = async (patientId: string) => {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({
+      patient_id: patientId,
+      started_at: now,
+      status: 'in-progress'
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
 export const updateSessionStatus = async (sessionId: string, status: string) => {
   const { data, error } = await supabase
     .from('sessions')

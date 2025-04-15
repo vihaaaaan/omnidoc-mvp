@@ -31,8 +31,9 @@ function App() {
         {authState.isAuthenticated ? <PatientDetail /> : <LoginPage />}
       </Route>
       
-      {/* Session link - publicly accessible, no authentication needed */}
+      {/* Session links - publicly accessible, no authentication needed */}
       <Route path="/session/:sessionId/:token" component={SessionLink} />
+      <Route path="/session/:sessionId" component={SessionLink} />
       
       {/* Redirect to dashboard if authenticated, login if not */}
       <Route path="/">
