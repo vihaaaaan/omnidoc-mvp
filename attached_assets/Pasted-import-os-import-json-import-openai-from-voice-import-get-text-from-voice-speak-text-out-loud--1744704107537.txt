@@ -2,42 +2,42 @@ import os
 import json
 import openai
 # from voice import get_text_from_voice, speak_text_out_loud
-
+ 
 
 # ---- Configuration ----
 GROQ_API_KEY = "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"
 BASE_URL = https://api.groq.com/openai/v1
 GPT_MODEL = "llama-3.3-70b-versatile"
 SCHEMA_PATH = "/Users/suryasuresh/Documents/omnidoc-ai/omnidoc_backend/core/utils/schema.json"
-
+ 
 # ---- Initialize Groq Client ----
 client = openai.OpenAI(
     api_key=GROQ_API_KEY,
     base_url=BASE_URL
 )
-
+ 
 # ---- Load & Save Schema ----
 def load_schema():
     with open(SCHEMA_PATH, "r") as f:
         return json.load(f)
-
+ 
 def save_schema(schema):
     with open(SCHEMA_PATH, "w") as f:
         json.dump(schema, f, indent=2)
-
+ 
 # ---- Reset Schema on Start ----
 def reset_schema():
     schema = load_schema()
     cleared_schema = {k: "" for k in schema}
     save_schema(cleared_schema)
-
+ 
 # ---- Get Next Unanswered Field ----
 def get_next_unfilled_field(schema):
     for field, value in schema.items():
         if value in [None, "", []]:
             return field
     return None
-
+ 
 # ---- Generate First Question ----
 def generate_first_question(field):
     system_prompt = (
@@ -47,7 +47,7 @@ def generate_first_question(field):
         "Only ask for the information, not for analysis or judgment."
     )
     user_prompt = f"Start the conversation by asking a question related to the field: '{field}'"
-
+ 
     response = client.chat.completions.create(
         model=GPT_MODEL,
         messages=[
@@ -56,9 +56,9 @@ def generate_first_question(field):
         ],
         temperature=0.7
     )
-
+ 
     return response.choices[0].message.content.strip()
-
+ 
 # ---- Generate Transition + Next Question ----
 def generate_transition_question(prev_response, next_field):
     system_prompt = (
@@ -69,7 +69,7 @@ def generate_transition_question(prev_response, next_field):
         f"The patient said: \"{prev_response}\"\n"
         f"The next field is: \"{next_field}\""
     )
-
+ 
     response = client.chat.completions.create(
         model=GPT_MODEL,
         messages=[
@@ -78,9 +78,9 @@ def generate_transition_question(prev_response, next_field):
         ],
         temperature=0.7
     )
-
+ 
     return response.choices[0].message.content.strip()
-
+ 
 # ---- Check if Response is Sufficient ----
 def needs_follow_up(field, response):
     system_prompt = (
@@ -89,7 +89,7 @@ def needs_follow_up(field, response):
         "Reply only with 'yes' or 'no'. Be strict: if you're unsure, return 'no'."
     )
     user_prompt = f"Field: {field}\nPatient response: \"{response}\"\nIs this complete?"
-
+ 
     result = client.chat.completions.create(
         model=GPT_MODEL,
         messages=[
@@ -98,9 +98,9 @@ def needs_follow_up(field, response):
         ],
         temperature=0.2
     )
-
+ 
     return result.choices[0].message.content.strip().lower() == "yes"
-
+ 
 # ---- Ask a Clarifying Follow-up ----
 def generate_follow_up_question(field, response):
     system_prompt = (
@@ -108,7 +108,7 @@ def generate_follow_up_question(field, response):
         "Ask a short, friendly follow-up question to clarify the answer for the given field."
     )
     user_prompt = f"Field: {field}\nPatient response: \"{response}\""
-
+ 
     result = client.chat.completions.create(
         model=GPT_MODEL,
         messages=[
@@ -117,9 +117,9 @@ def generate_follow_up_question(field, response):
         ],
         temperature=0.7
     )
-
+ 
     return result.choices[0].message.content.strip()
-
+ 
 # ---- Convert Raw Response into Structured Data ----
 def summarize_response_for_schema(field, raw_response):
     system_prompt = (
@@ -128,7 +128,7 @@ def summarize_response_for_schema(field, raw_response):
         "Return only the value with no extra words."
     )
     user_prompt = f"Field: {field}\nResponse: \"{raw_response}\""
-
+ 
     response = client.chat.completions.create(
         model=GPT_MODEL,
         messages=[
@@ -137,42 +137,42 @@ def summarize_response_for_schema(field, raw_response):
         ],
         temperature=0.3
     )
-
+ 
     return response.choices[0].message.content.strip()
-
+ 
 # ---- Main Interview Loop ----
 def run_prescreening():
     reset_schema()
     schema = load_schema()
     last_response = None
     first_question_asked = False
-
+ 
     while True:
         field = get_next_unfilled_field(schema)
         if not field:
             print("✅ All fields completed.")
             break
-
+ 
         if not first_question_asked:
             message = generate_first_question(field)
             first_question_asked = True
         else:
             message = generate_transition_question(last_response, field)
-
+ 
         print(f"[Nurse] {message}")
         # speak_text_out_loud(message)
-
+ 
 
         response_complete = False
         attempts = 0
         raw_response = ""
-
+ 
         while not response_complete and attempts < 3:
             print("🎤 Listening for response...")
             raw_response = input("🗣️ Simulated Patient Response: ")
             # raw_response = get_text_from_voice()
             # print(f"📝 You said: {raw_response}")
-
+ 
 
             if needs_follow_up(field, raw_response):
                 response_complete = True
@@ -180,14 +180,15 @@ def run_prescreening():
                 follow_up = generate_follow_up_question(field, raw_response)
                 print(f"[Nurse] {follow_up}")
                 attempts += 1
-
+ 
         # Whether complete or not, store the latest response
         clean_value = summarize_response_for_schema(field, raw_response)
         schema[field] = clean_value
         save_schema(schema)
-
+ 
         last_response = raw_response
-
+ 
 if __name__ == "__main__":
     run_prescreening()
-
+ 
+ 
