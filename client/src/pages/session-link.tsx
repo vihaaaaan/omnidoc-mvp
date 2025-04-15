@@ -198,7 +198,7 @@ const SessionLink = () => {
   });
   
   // Fetch session information to verify it exists
-  const { data: sessionData, isLoading: isSessionLoading } = useQuery({
+  const { data: sessionData, isLoading: isSessionLoading } = useQuery<Session>({
     queryKey: [`/api/sessions/${sessionId}`],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!sessionId,
@@ -231,13 +231,14 @@ const SessionLink = () => {
         queryKey: [`/api/sessions/${sessionId}`]
       });
       
-      // Also invalidate the patient's sessions list
-      if (sessionData?.patient_id) {
+      // Also invalidate related queries if we have patient data
+      const patientId = sessionData?.patient_id;
+      if (patientId) {
         queryClient.invalidateQueries({
-          queryKey: [`/api/patients/${sessionData.patient_id}/sessions`]
+          queryKey: [`/api/patients/${patientId}/sessions`]
         });
         queryClient.invalidateQueries({
-          queryKey: [`/api/patients/${sessionData.patient_id}/sessions-with-reports`]
+          queryKey: [`/api/patients/${patientId}/sessions-with-reports`]
         });
       }
       
@@ -422,7 +423,7 @@ const SessionLink = () => {
             </p>
             
             {/* Patient details if available */}
-            {sessionData && sessionData.patient_id && (
+            {sessionData && (
               <div className="w-full bg-blue-50 p-4 rounded-lg mb-2">
                 <h3 className="font-medium mb-2 text-blue-800">Session Information:</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -430,8 +431,12 @@ const SessionLink = () => {
                   <span className="font-mono">{sessionId}</span>
                   <span className="text-blue-700">Status:</span>
                   <span className="font-semibold text-green-600">Completed</span>
-                  <span className="text-blue-700">Created:</span>
-                  <span>{new Date(sessionData.started_at).toLocaleString()}</span>
+                  {sessionData.started_at && (
+                    <>
+                      <span className="text-blue-700">Created:</span>
+                      <span>{new Date(sessionData.started_at).toLocaleString()}</span>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -465,7 +470,7 @@ const SessionLink = () => {
                 </Link>
               </Button>
               
-              {sessionData && sessionData.patient_id && (
+              {sessionData?.patient_id && (
                 <Button asChild className="flex-1 bg-blue-600 hover:bg-blue-700">
                   <Link href={`/patients/${sessionData.patient_id}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
