@@ -31,6 +31,11 @@ interface SpeechRecognitionConstructor {
   new (): SpeechRecognition;
 }
 
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
 declare global {
   interface Window {
     SpeechRecognition?: SpeechRecognitionConstructor;
@@ -332,8 +337,12 @@ const SessionLink = () => {
         recognitionRef.current.lang = 'en-US';
         
         recognitionRef.current.onresult = (event) => {
+          // Using type assertion here to fix the TypeScript error
           const transcript = Array.from(event.results)
-            .map(result => result[0].transcript)
+            .map((result: any) => {
+              // Using any type to work around TypeScript limitations
+              return result[0].transcript;
+            })
             .join('');
           
           setPatientResponse(transcript);

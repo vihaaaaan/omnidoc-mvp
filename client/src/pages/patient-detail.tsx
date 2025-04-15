@@ -108,7 +108,10 @@ const PatientDetail = () => {
             <Button 
               size="sm" 
               className="bg-primary-600 hover:bg-primary-700 text-white"
-              onClick={() => createSessionMutation.mutate()}
+              onClick={() => {
+                console.log('New Session button clicked');
+                createSessionMutation.mutate();
+              }}
               disabled={createSessionMutation.isPending}
             >
               {createSessionMutation.isPending ? (
