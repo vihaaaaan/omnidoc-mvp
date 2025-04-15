@@ -182,14 +182,50 @@ const PatientDetail = () => {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [currentSession, setCurrentSession] = useState<any>(null);
   
-  // Create new session mutation
+  // Create new session function - using direct function call for better reliability
+  const handleCreateSession = async () => {
+    if (!id) {
+      toast({
+        title: 'Error',
+        description: 'Patient ID is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      console.log('Creating new session for patient:', id);
+      // Call the createSession function directly
+      const newSession = await createSession(id);
+      console.log('Session created successfully:', newSession);
+      
+      toast({
+        title: 'New Session Created',
+        description: 'You can now share the session link with the patient.',
+      });
+      
+      // Save the session and show the share dialog
+      setCurrentSession(newSession);
+      setShowShareDialog(true);
+      
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      toast({
+        title: 'Error Creating Session',
+        description: (error instanceof Error) ? error.message : 'Failed to create new session',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Create new session mutation (keeping this for API pattern consistency)
   const createSessionMutation = useMutation({
     mutationFn: async () => {
       if (!id) throw new Error('Patient ID is required');
       return await createSession(id);
     },
     onSuccess: (session) => {
-      console.log('Session created successfully:', session);
+      console.log('Session created successfully with mutation:', session);
       toast({
         title: 'New Session Created',
         description: 'You can now share the session link with the patient.',
@@ -200,7 +236,7 @@ const PatientDetail = () => {
       setShowShareDialog(true);
     },
     onError: (error) => {
-      console.error('Failed to create session:', error);
+      console.error('Failed to create session with mutation:', error);
       toast({
         title: 'Error Creating Session',
         description: (error as Error).message || 'Failed to create new session',
@@ -273,21 +309,13 @@ const PatientDetail = () => {
               Edit Patient
             </Button>
             
-            {/* New Session Button */}
+            {/* New Session Button - Using direct function call for reliability */}
             <Button 
-              onClick={() => {
-                console.log('New Session button clicked');
-                createSessionMutation.mutate();
-              }}
+              onClick={handleCreateSession}
               className="h-9 px-3 inline-flex items-center bg-primary-600 hover:bg-primary-700 text-white font-medium text-sm"
-              disabled={createSessionMutation.isPending}
             >
-              {createSessionMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <PlusCircle className="h-4 w-4 mr-2" />
-              )}
-              {createSessionMutation.isPending ? 'Creating...' : 'New Session'}
+              <PlusCircle className="h-4 w-4 mr-2" />
+              New Session
             </Button>
           </div>
         )}
@@ -352,6 +380,11 @@ const PatientDetail = () => {
         <SessionsList 
           sessions={sessions || []} 
           isLoading={isLoadingSessions}
+          onSessionCreated={(session) => {
+            // When a session is created from the SessionsList component
+            setCurrentSession(session);
+            setShowShareDialog(true);
+          }}
         />
       )}
       

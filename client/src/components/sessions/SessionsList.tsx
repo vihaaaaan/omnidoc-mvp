@@ -1,20 +1,27 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 import SessionRow from './SessionRow';
 import EmptySessionState from './EmptySessionState';
 import ReportDetail from '../reports/ReportDetail';
+import { createSession } from '@/lib/supabase';
+import { useParams } from 'wouter';
+import { toast } from '@/hooks/use-toast';
 import type { SessionWithReport } from '@/types';
 
 interface SessionsListProps {
   sessions: SessionWithReport[];
   isLoading: boolean;
+  onSessionCreated?: (session: any) => void;
 }
 
-const SessionsList = ({ sessions, isLoading }: SessionsListProps) => {
+const SessionsList = ({ sessions, isLoading, onSessionCreated }: SessionsListProps) => {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedSession, setSelectedSession] = useState<SessionWithReport | null>(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const params = useParams();
+  const { id: patientId } = params;
 
   // Filter sessions based on tab
   const filteredSessions = sessions.filter(session => {
@@ -32,20 +39,60 @@ const SessionsList = ({ sessions, isLoading }: SessionsListProps) => {
     setSelectedSession(null);
   };
 
+  // Create a new session
+  const handleCreateSession = async () => {
+    if (!patientId) {
+      toast({
+        title: 'Error',
+        description: 'Patient ID is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreatingSession(true);
+    
+    try {
+      console.log('Creating new session for patient:', patientId);
+      const newSession = await createSession(patientId);
+      console.log('Session created successfully from SessionsList:', newSession);
+      
+      toast({
+        title: 'New Session Created',
+        description: 'You can now share the session link with the patient.',
+      });
+      
+      if (onSessionCreated) {
+        onSessionCreated(newSession);
+      }
+      
+    } catch (error) {
+      console.error('Failed to create session from SessionsList:', error);
+      toast({
+        title: 'Error Creating Session',
+        description: (error instanceof Error) ? error.message : 'Failed to create new session',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingSession(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-medium text-gray-900">Sessions & Reports</h2>
         <Button 
-          onClick={() => {
-            // The logic to create a new session should go here
-            // This button should behave the same as the one in PatientDetail
-            console.log('Create new session from SessionsList');
-          }}
+          onClick={handleCreateSession}
           className="px-4 py-2 text-sm text-primary-600 bg-primary-50 hover:bg-primary-100"
+          disabled={isCreatingSession}
         >
-          <PlusCircle className="h-4 w-4 mr-2" />
-          New Session
+          {isCreatingSession ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <PlusCircle className="h-4 w-4 mr-2" />
+          )}
+          {isCreatingSession ? 'Creating...' : 'New Session'}
         </Button>
       </div>
 
