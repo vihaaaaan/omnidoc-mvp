@@ -1,39 +1,380 @@
+import { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Loader2, Mic, MicOff, Play, Square, Send, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
+// Voice-to-voice session page
 const SessionLink = () => {
   const { sessionId, token } = useParams();
+  const { toast } = useToast();
+  
+  // Session state
+  const [isSessionStarted, setIsSessionStarted] = useState(false);
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
+  const [currentField, setCurrentField] = useState('');
+  const [currentQuestion, setCurrentQuestion] = useState('');
+  const [patientResponse, setPatientResponse] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [schema, setSchema] = useState<Record<string, string>>({});
+  
+  // References for audio
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   
   console.log('Session link page loaded with sessionId:', sessionId, 'and token:', token);
   
+  // Start session mutation
+  const startSessionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`http://localhost:5001/api/start-session/${sessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to start session');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setIsSessionStarted(true);
+      setCurrentField(data.current_field);
+      setCurrentQuestion(data.question);
+      
+      // Speak the first question
+      speakText(data.question);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to start session. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  });
+  
+  // Process response mutation
+  const processResponseMutation = useMutation({
+    mutationFn: async (response: string) => {
+      const res = await fetch(`http://localhost:5001/api/process-response/${sessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          response,
+          current_field: currentField,
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to process response');
+      }
+      
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.complete) {
+        setIsSessionComplete(true);
+        setSchema(data.schema);
+        
+        // Create report via API
+        createReport(data.schema);
+        
+        toast({
+          title: 'Session Complete',
+          description: 'Thank you for completing the session. Your information has been recorded.',
+        });
+      } else {
+        setCurrentField(data.current_field);
+        setCurrentQuestion(data.question);
+        
+        // Speak the next question
+        speakText(data.question);
+      }
+      
+      // Clear the response
+      setPatientResponse('');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to process your response. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  });
+  
+  // Create report in the system
+  const createReport = async (schema: Record<string, string>) => {
+    try {
+      // Convert schema to a summary
+      const summary = Object.entries(schema)
+        .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`)
+        .join('\n');
+      
+      // Create the report
+      await apiRequest('POST', '/api/reports', {
+        session_id: sessionId,
+        summary,
+        json_schema: schema
+      });
+      
+      // Update the session status
+      await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
+        status: 'completed'
+      });
+      
+    } catch (error) {
+      console.error('Failed to create report:', error);
+    }
+  };
+  
+  // Text to speech function
+  const speakText = async (text: string) => {
+    try {
+      setIsPlaying(true);
+      
+      const res = await fetch('http://localhost:5001/api/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to convert text to speech');
+      }
+      
+      const audio = new Audio(`http://localhost:5001/temp_audio.wav`);
+      
+      audio.onended = () => {
+        setIsPlaying(false);
+      };
+      
+      audio.play();
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      setIsPlaying(false);
+      
+      // Fallback to browser's TTS if available
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        speechSynthesis.speak(utterance);
+      }
+    }
+  };
+  
+  // Start recording function
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+      
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        
+        // Convert to base64 for sending to API
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+          
+          // For development: just handle manually entered text
+          // In production, we'd send the audio data to the speech-to-text API
+          // processResponseMutation.mutate(transcribedText);
+        };
+        
+        // Close the media stream
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorderRef.current.start();
+      setIsListening(true);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast({
+        title: 'Microphone Error',
+        description: 'Failed to access microphone. Please check permissions.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Stop recording function
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isListening) {
+      mediaRecorderRef.current.stop();
+      setIsListening(false);
+    }
+  };
+  
+  // Handle manual response submission
+  const handleResponseSubmit = () => {
+    if (patientResponse.trim()) {
+      processResponseMutation.mutate(patientResponse);
+    }
+  };
+  
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && isListening) {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, [isListening]);
+  
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-5">
-      <div className="bg-white shadow-md rounded-xl p-8 max-w-md w-full">
-        <h1 className="text-2xl font-bold text-center mb-6">Patient Session</h1>
-        
-        <div className="mb-6">
-          <p className="text-gray-600 mb-4">
-            This is a placeholder for the session link page that will allow patients to participate in a voice conversation and get their report filled out.
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center p-5">
+      <Card className="w-full max-w-2xl p-6 shadow-lg">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold">Patient Health Interview</h1>
+          <p className="text-gray-600 mt-2">
+            Answer the questions to complete your health screening
           </p>
-          
-          <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
-            <p className="text-sm text-gray-500 mb-1">Session ID:</p>
-            <p className="font-medium">{sessionId}</p>
-          </div>
-          
-          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-            <p className="text-sm text-gray-500 mb-1">Verification Token:</p>
-            <p className="font-medium">{token}</p>
-          </div>
         </div>
         
-        <div className="text-center">
-          <Link href="/" className="text-primary-600 hover:text-primary-800 font-medium">
-            Return to home page
-          </Link>
-        </div>
-      </div>
+        {!isSessionStarted ? (
+          <div className="flex flex-col items-center space-y-4">
+            <p className="text-center text-gray-700 mb-4">
+              This virtual health interview will ask you a series of questions about your health concerns.
+              Your responses will be recorded and shared with your healthcare provider.
+            </p>
+            
+            <Button 
+              onClick={() => startSessionMutation.mutate()}
+              disabled={startSessionMutation.isPending}
+              className="w-full max-w-xs"
+            >
+              {startSessionMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Begin Health Interview
+            </Button>
+          </div>
+        ) : isSessionComplete ? (
+          <div className="flex flex-col items-center space-y-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            
+            <h2 className="text-xl font-semibold text-center">Interview Completed</h2>
+            <p className="text-center text-gray-600">
+              Thank you for completing your health interview. Your doctor will review your information before your appointment.
+            </p>
+            
+            <div className="border border-gray-200 rounded-lg p-4 w-full mt-4 bg-gray-50">
+              <h3 className="font-medium mb-2">Summary:</h3>
+              <div className="space-y-1 text-sm">
+                {Object.entries(schema).map(([key, value]) => (
+                  <div key={key} className="grid grid-cols-3 gap-2">
+                    <span className="font-medium text-gray-700 capitalize">{key.replace(/_/g, ' ')}:</span>
+                    <span className="col-span-2">{value || 'Not provided'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <Button variant="outline" asChild className="mt-4">
+              <Link href="/">Return to home</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Current question display */}
+            <div className="bg-blue-50 p-4 rounded-lg shadow-sm">
+              <p className="text-lg font-medium text-blue-900">{currentQuestion}</p>
+              
+              <div className="flex justify-end mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => speakText(currentQuestion)}
+                  disabled={isPlaying}
+                >
+                  {isPlaying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            
+            {/* Voice recording controls */}
+            <div className="flex flex-col items-center space-y-4">
+              <div className="flex space-x-4">
+                <Button
+                  variant={isListening ? "destructive" : "default"}
+                  onClick={isListening ? stopRecording : startRecording}
+                  disabled={processResponseMutation.isPending || isPlaying}
+                  className="w-32"
+                >
+                  {isListening ? (
+                    <>
+                      <MicOff className="mr-2 h-4 w-4" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="mr-2 h-4 w-4" />
+                      Record
+                    </>
+                  )}
+                </Button>
+                
+                {/* Temporary: While speech recognition is being developed, use text input */}
+                <p className="text-sm text-gray-500 italic">
+                  Voice recording is simulated for this demo
+                </p>
+              </div>
+              
+              {/* Text input as fallback */}
+              <div className="w-full space-y-2">
+                <textarea
+                  value={patientResponse}
+                  onChange={(e) => setPatientResponse(e.target.value)}
+                  placeholder="Type your response here..."
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={3}
+                  disabled={processResponseMutation.isPending || isPlaying}
+                />
+                
+                <Button
+                  onClick={handleResponseSubmit}
+                  disabled={!patientResponse.trim() || processResponseMutation.isPending || isPlaying}
+                  className="w-full"
+                >
+                  {processResponseMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Submit Response
+                </Button>
+              </div>
+            </div>
+            
+            {/* Field progress indicator */}
+            <div className="mt-4 text-sm text-gray-500">
+              <p>Current topic: <span className="font-medium capitalize">{currentField?.replace(/_/g, ' ')}</span></p>
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
   );
 };
