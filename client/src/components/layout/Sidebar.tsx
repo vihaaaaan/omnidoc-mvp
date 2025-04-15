@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/auth-provider';
 import { 
   Activity, 
   Calendar, 

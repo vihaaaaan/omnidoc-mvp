@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Sidebar from './Sidebar';
 import MobileHeader from './MobileHeader';
 import MobileSidebar from './MobileSidebar';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/auth-provider';
 import { Loader2 } from 'lucide-react';
 
 interface MainLayoutProps {

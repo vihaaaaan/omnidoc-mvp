@@ -7,12 +7,21 @@ import { getPatients } from '@/lib/supabase';
 import type { Patient } from '@/types';
 
 const Dashboard = () => {
+  console.log('Dashboard component rendering');
+  
   // Fetch patients data
   const { data: patients, isLoading, error } = useQuery({
     queryKey: ['/api/patients'],
     queryFn: async () => {
-      const patientsData = await getPatients();
-      return patientsData as Patient[];
+      console.log('Fetching patients data');
+      try {
+        const patientsData = await getPatients();
+        console.log('Patient data fetched successfully:', patientsData);
+        return patientsData as Patient[];
+      } catch (err) {
+        console.error('Error fetching patients:', err);
+        throw err;
+      }
     }
   });
 
