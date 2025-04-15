@@ -224,63 +224,14 @@ const SessionLink = () => {
   const createReport = async (schema: Record<string, string>) => {
     try {
       // For demo sessions that don't exist in the database,
-      // we need to create a session first
+      // we'll just display the results without creating a database record
       if (!sessionData) {
-        console.log('Session not found in database. Creating one.');
-        
-        try {
-          // First, check if we have patientId in the URL parameters
-          let patient_id = new URLSearchParams(window.location.search).get('patient_id');
-          
-          // If not, use a default patient
-          if (!patient_id) {
-            // Use the first patient in the system
-            patient_id = '01a29217-7965-42c4-b025-23c5da7ed826';
-            
-            toast({
-              title: 'Using Default Patient',
-              description: 'No patient specified, using the first patient in the system.',
-            });
-          }
-          
-          // Create the session with the specified ID if possible
-          try {
-            const createdSession = await apiRequest('POST', '/api/sessions', {
-              id: sessionId, // Try to use the existing sessionId
-              patient_id,
-              status: 'in-progress'
-            });
-            
-            console.log('Created session:', createdSession);
-            
-            // Refresh session data
-            queryClient.invalidateQueries({
-              queryKey: [`/api/sessions/${sessionId}`]
-            });
-            
-          } catch (error) {
-            console.error('Could not create session with specific ID, creating a new one:', error);
-            
-            // Create a new session
-            const createdSession = await apiRequest('POST', '/api/sessions', {
-              patient_id,
-              status: 'in-progress'
-            });
-            
-            console.log('Created new session:', createdSession);
-            
-            // Use this new session ID instead
-            sessionId = createdSession.id;
-          }
-        } catch (error) {
-          console.error('Failed to create session:', error);
-          toast({
-            title: 'Error',
-            description: 'Could not create a session in the database.',
-            variant: 'destructive',
-          });
-          return null;
-        }
+        console.log('Session not found in database. Using demo mode.');
+        toast({
+          title: 'Demo Mode',
+          description: 'This is a demo session. Report data is displayed but not saved to database.',
+        });
+        return { id: 'demo-report', session_id: sessionId, summary: 'Demo report', json_schema: schema };
       }
       
       // First update the session status to completed
