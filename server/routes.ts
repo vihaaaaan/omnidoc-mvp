@@ -351,9 +351,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate speech using ElevenLabs
       const audioBuffer = await textToSpeech(text, voiceId);
       
-      // Send the audio as a buffer
+      // Send the audio buffer directly (already a Buffer)
       res.setHeader('Content-Type', 'audio/mpeg');
-      res.send(Buffer.from(audioBuffer));
+      res.send(audioBuffer);
     } catch (error) {
       console.error('Error generating text-to-speech:', error);
       res.status(500).json({ 
@@ -403,9 +403,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clean up after serving
       req.app.locals.pendingAudio.delete(audioId);
       
-      // Send the audio as a buffer
+      // Send the audio buffer directly (already a Buffer)
       res.setHeader('Content-Type', 'audio/mpeg');
-      res.send(Buffer.from(audioBuffer));
+      res.send(audioBuffer);
     } catch (error) {
       console.error('Error serving audio file:', error);
       res.status(500).json({
