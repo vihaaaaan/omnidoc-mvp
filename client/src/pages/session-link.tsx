@@ -310,60 +310,70 @@ const SessionLink = () => {
   };
   
   // Text to speech function with ElevenLabs for high-quality voice
+  // No fallback to browser TTS as we want to exclusively use ElevenLabs
   const speakText = async (text: string) => {
     setIsPlaying(true);
+    console.log('Speaking text with ElevenLabs, audioUrl:', audioUrl);
     
     try {
       // Check if there's an audioUrl in the response data
-      // If so, we can play the ElevenLabs audio
       if (audioUrl) {
+        console.log('Using ElevenLabs audio from:', audioUrl);
         const audio = new Audio(audioUrl);
         
         audio.onended = () => {
+          console.log('ElevenLabs audio playback completed');
           setIsPlaying(false);
         };
         
-        audio.onerror = () => {
-          console.error('Error playing ElevenLabs audio');
+        audio.onerror = (e) => {
+          console.error('Error playing ElevenLabs audio:', e);
           setIsPlaying(false);
-          fallbackToNativeTTS(text);
+          
+          toast({
+            title: 'Audio Playback Error',
+            description: 'There was an error playing the audio. Please try again.',
+            variant: 'destructive',
+          });
         };
         
-        await audio.play();
+        audio.oncanplay = () => {
+          console.log('ElevenLabs audio is ready to play');
+        };
+        
+        audio.onloadstart = () => {
+          console.log('ElevenLabs audio loading started');
+        };
+        
+        await audio.play().catch(error => {
+          console.error('Failed to play ElevenLabs audio:', error);
+          setIsPlaying(false);
+          
+          toast({
+            title: 'Audio Playback Error',
+            description: 'Failed to play the audio. Please try clicking the play button again.',
+            variant: 'destructive',
+          });
+        });
       } else {
-        // If no ElevenLabs audio URL is available, fall back to browser TTS
-        fallbackToNativeTTS(text);
+        // If no ElevenLabs audio URL is available, show an error
+        console.error('No ElevenLabs audio URL available');
+        setIsPlaying(false);
+        
+        toast({
+          title: 'Audio Not Available',
+          description: 'The text-to-speech audio is not available. Please read the question.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error with ElevenLabs audio playback:', error);
       setIsPlaying(false);
-      fallbackToNativeTTS(text);
-    }
-  };
-    
-  // Fallback to browser's native speech synthesis if ElevenLabs is unavailable
-  const fallbackToNativeTTS = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
       
-      utterance.onend = () => {
-        setIsPlaying(false);
-      };
-      
-      utterance.onerror = () => {
-        console.error('Speech synthesis error');
-        setIsPlaying(false);
-      };
-      
-      speechSynthesis.speak(utterance);
-    } else {
-      // If browser speech synthesis is not available
-      console.warn('Browser TTS not available');
-      setIsPlaying(false);
       toast({
-        title: 'Speech Not Available',
-        description: 'Text-to-speech is unavailable. Please read the questions manually.',
-        variant: 'default',
+        title: 'Audio Playback Error',
+        description: 'There was an unexpected error with audio playback.',
+        variant: 'destructive',
       });
     }
   };
@@ -569,10 +579,9 @@ const SessionLink = () => {
                       size="sm" 
                       className="h-8 w-8 p-0"
                       onClick={() => {
-                        if ('speechSynthesis' in window) {
-                          window.speechSynthesis.cancel();
-                          setIsPlaying(false);
-                        }
+                        // We don't use browser speech synthesis anymore
+                        // Just stop the audio playback and reset state
+                        setIsPlaying(false);
                       }}
                     >
                       <Square className="h-4 w-4 text-blue-600" />
