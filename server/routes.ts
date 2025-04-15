@@ -5,6 +5,7 @@ import { insertPatientSchema, insertSessionSchema, insertReportSchema } from "@s
 import { z } from "zod";
 import { handleSendEmail } from "./send-email";
 import { generateFirstQuestion, processResponse, generateReport, getSessionState } from "./llm-service";
+import { textToSpeech, getAvailableVoices } from "./elevenlabs-tts";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes prefix
@@ -283,6 +284,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         message: 'Failed to get session state',
+        error: String(error)
+      });
+    }
+  });
+  
+  // ElevenLabs text-to-speech API endpoints
+  apiRouter.post("/tts", async (req: Request, res: Response) => {
+    try {
+      const { text, voiceId } = req.body;
+      
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Text is required and must be a string' 
+        });
+      }
+      
+      // Generate speech using ElevenLabs
+      const audioBuffer = await textToSpeech(text, voiceId);
+      
+      // Send the audio as a buffer
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.send(Buffer.from(audioBuffer));
+    } catch (error) {
+      console.error('Error generating text-to-speech:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to generate speech',
+        error: String(error)
+      });
+    }
+  });
+  
+  apiRouter.get("/tts/voices", async (req: Request, res: Response) => {
+    try {
+      // Get available voices from ElevenLabs
+      const voices = await getAvailableVoices();
+      res.json({ 
+        success: true, 
+        voices 
+      });
+    } catch (error) {
+      console.error('Error getting voices:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to get voices',
         error: String(error)
       });
     }
