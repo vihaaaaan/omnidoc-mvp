@@ -28,11 +28,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Get initial session
     const initializeAuth = async () => {
       try {
+        console.log('Initializing auth state, current location:', location);
+        
         // Get session from Supabase
         const { data } = await supabase.auth.getSession();
+        console.log('Auth session data:', data);
+        
         const { session } = data;
         
         if (session) {
+          console.log('Found existing session, user:', session.user);
           setAuthState({
             user: session.user,
             session,
@@ -40,6 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             isAuthenticated: true,
           });
         } else {
+          console.log('No session found, setting unauthenticated state');
           setAuthState({
             user: null,
             session: null,
@@ -49,6 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           
           // If not logged in and not on login page, redirect to login
           if (location !== '/login') {
+            console.log('Redirecting to login page');
             navigate('/login');
           }
         }
@@ -66,17 +73,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initializeAuth();
 
     // Subscribe to auth changes
+    console.log('Setting up auth state change listener');
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
+        console.log('Auth state change event:', event, 'Session:', session);
+        
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+          console.log('User session detected, updating state and redirecting');
           setAuthState({
             user: session.user,
             session,
             loading: false,
             isAuthenticated: true,
           });
-          navigate('/dashboard');
+          
+          if (location !== '/dashboard') {
+            console.log('Redirecting to dashboard from', location);
+            navigate('/dashboard');
+          }
         } else if (event === 'SIGNED_OUT') {
+          console.log('User signed out event detected, clearing state and redirecting');
           setAuthState({
             user: null,
             session: null,
@@ -84,6 +100,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             isAuthenticated: false,
           });
           navigate('/login');
+        } else {
+          console.log('Other auth event:', event, 'Current location:', location);
         }
       }
     );
@@ -97,12 +115,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Sign in function
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting to sign in with email:', email);
       const { data, error } = await supabaseSignIn(email, password);
+      
+      console.log('Sign in response:', { data, error });
 
       if (error) {
+        console.error('Sign in error:', error);
         return { error };
       }
 
+      console.log('Sign in successful, setting auth state with user:', data.user);
       setAuthState({
         user: data.user,
         session: data.session,
@@ -112,7 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return { error: null };
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('Unexpected error signing in:', error);
       return { error };
     }
   };

@@ -8,9 +8,13 @@ import NotFound from "@/pages/not-found";
 function App() {
   const { authState } = useAuth();
   
-  // If auth is still loading, don't render routes yet
+  // If auth is still loading, show a loading indicator
   if (authState.loading) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
   }
 
   return (
