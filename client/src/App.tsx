@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/auth-provider";
 import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import PatientDetail from "@/pages/patient-detail";
+import SessionLink from "@/pages/session-link";
 import NotFound from "@/pages/not-found";
 
 function App() {
@@ -29,6 +30,9 @@ function App() {
       <Route path="/patients/:id">
         {authState.isAuthenticated ? <PatientDetail /> : <LoginPage />}
       </Route>
+      
+      {/* Session link - publicly accessible, no authentication needed */}
+      <Route path="/session/:sessionId/:token" component={SessionLink} />
       
       {/* Redirect to dashboard if authenticated, login if not */}
       <Route path="/">
