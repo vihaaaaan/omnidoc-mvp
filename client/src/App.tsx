@@ -1,5 +1,5 @@
 import { Route, Switch } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth-provider";
 import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import PatientDetail from "@/pages/patient-detail";

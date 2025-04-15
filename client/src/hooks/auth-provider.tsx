@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, signIn as supabaseSignIn, signOut as supabaseSignOut } from '@/lib/supabase';
 import type { AuthState } from '@/types';
 import { useLocation } from 'wouter';
 
@@ -97,10 +97,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Sign in function
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await supabaseSignIn(email, password);
 
       if (error) {
         return { error };
@@ -123,7 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Sign out function
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      await supabaseSignOut();
       setAuthState({
         user: null,
         session: null,
