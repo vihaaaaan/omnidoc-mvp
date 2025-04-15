@@ -49,9 +49,11 @@ const ReportDetail = ({ session, report, onClose }: ReportDetailProps) => {
 
       {/* Report Summary */}
       {report.summary && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-md font-medium text-gray-900 mb-3">Summary</h3>
-          <p className="text-sm text-gray-700">{report.summary}</p>
+        <div className="mb-6 p-6 bg-gray-50 rounded-lg border border-gray-100">
+          <h3 className="text-md font-medium text-gray-900 mb-3">Medical Summary</h3>
+          <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
+            {report.summary}
+          </p>
         </div>
       )}
 
@@ -63,16 +65,16 @@ const ReportDetail = ({ session, report, onClose }: ReportDetailProps) => {
           </h3>
 
           {/* JSON Schema rendering as key-value pairs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
             {Object.entries(report.json_schema).map(([key, value]) => (
-              <div key={key} className="border-b border-gray-100 pb-3">
-                <p className="text-sm text-gray-500 mb-1">
+              <div key={key} className="bg-white p-4 rounded-md border border-gray-100 shadow-sm">
+                <p className="text-sm font-semibold text-primary-600 mb-2">
                   {key
                     .split("_")
                     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
                     .join(" ")}
                 </p>
-                <p className="font-medium">{value as string}</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{value as string}</p>
               </div>
             ))}
           </div>

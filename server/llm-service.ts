@@ -132,13 +132,22 @@ export async function processResponse(
   }
   
   try {
-    // First, summarize and extract information from the response
+    // First, summarize and extract information from the response with improved formatting
     const summarizationResponse = await client.chat.completions.create({
       model: "llama3-70b-8192",
       messages: [
         {
           role: "system",
-          content: `You are a medical assistant extracting key information about a patient's ${session.currentField.replace('_', ' ')}. Provide a concise, professional summary of the key medical information in the patient's response.`
+          content: `You are a medical assistant extracting key information about a patient's ${session.currentField.replace('_', ' ')}. 
+          Provide a concise, professional summary of the key medical information in the patient's response.
+          
+          Important guidelines:
+          1. Write in plain text without any markdown or formatting
+          2. Do not use headings or bold text
+          3. Do not include labels like "Chief Complaint:" in your response
+          4. Summarize in 1-2 sentences maximum
+          5. Focus only on factual medical information
+          6. Use professional but straightforward language`
         },
         {
           role: "user",
@@ -147,7 +156,19 @@ export async function processResponse(
       ]
     });
     
-    const summary = summarizationResponse.choices[0].message.content || patientResponse;
+    // Extract and clean up the summary
+    let summary = summarizationResponse.choices[0].message.content || patientResponse;
+    
+    // Remove any markdown formatting that might be present
+    summary = summary.replace(/\*\*/g, ''); // Remove bold formatting
+    summary = summary.replace(/#+\s/g, ''); // Remove heading formatting
+    
+    // Remove labels if they exist (e.g., "Chief Complaint: ")
+    const fieldLabel = new RegExp(`${session.currentField.replace('_', ' ')}:\\s*`, 'i');
+    summary = summary.replace(fieldLabel, '');
+    
+    // Trim any extra whitespace
+    summary = summary.trim();
     
     // Update schema with summarized information
     session.schema[session.currentField!] = summary;
@@ -223,7 +244,17 @@ export async function generateReport(sessionId: string): Promise<{summary: strin
       messages: [
         {
           role: "system",
-          content: "You are a medical professional creating a concise summary report from patient screening data. Provide a professional medical assessment based on the information provided."
+          content: `You are a medical professional creating a concise summary report from patient screening data. 
+          Provide a professional medical assessment based on the information provided.
+          
+          Important formatting guidelines:
+          1. Format your response as a single cohesive paragraph of 3-5 sentences
+          2. Do not use bullet points, lists, or headings
+          3. Do not use any markdown formatting like bold or italics
+          4. Use professional medical terminology but ensure it's understandable to non-specialists
+          5. Focus on synthesizing the key medical insights rather than listing all data points
+          6. Start with the chief complaint, then cover key symptoms, and end with relevant medical context
+          7. Keep it concise but comprehensive`
         },
         {
           role: "user",
@@ -232,8 +263,20 @@ export async function generateReport(sessionId: string): Promise<{summary: strin
       ]
     });
     
-    const summary = reportResponse.choices[0].message.content || 
+    // Extract and clean the summary
+    let summary = reportResponse.choices[0].message.content || 
       "No report could be generated due to insufficient information.";
+    
+    // Remove any markdown formatting
+    summary = summary.replace(/\*\*/g, ''); // Remove bold formatting
+    summary = summary.replace(/#+\s/g, ''); // Remove heading formatting
+    summary = summary.replace(/\n\s*[-*]\s+/g, ' '); // Remove bullet points
+    
+    // Ensure it's a single paragraph
+    summary = summary.split('\n').join(' ').trim();
+    
+    // Remove any duplicate spaces
+    summary = summary.replace(/\s+/g, ' ');
     
     return {
       summary,
