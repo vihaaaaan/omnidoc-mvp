@@ -1,3 +1,3 @@
 #!/bin/bash
-echo "Starting Voice Processing Service..."
+echo "Starting Voice API service..."
 python voice_api.py
