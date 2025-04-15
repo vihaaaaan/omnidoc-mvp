@@ -105,22 +105,52 @@ const PatientDetail = () => {
               <Edit className="h-4 w-4 mr-2" />
               Edit Patient
             </Button>
-            <Button 
-              size="sm" 
-              className="bg-primary-600 hover:bg-primary-700 text-white"
+            
+            {/* Regular HTML button for better compatibility */}
+            <button 
+              type="button"
+              className="h-9 rounded-md px-3 inline-flex items-center bg-primary-600 hover:bg-primary-700 text-white font-medium text-sm"
               onClick={() => {
-                console.log('New Session button clicked');
-                createSessionMutation.mutate();
+                console.log('New Session button clicked (regular HTML)');
+                if (id) {
+                  console.log('Creating session for patient:', id);
+                  
+                  // Show loading toast
+                  toast({
+                    title: 'Creating new session...',
+                    description: 'Please wait while we set up the session.',
+                  });
+                  
+                  createSession(id).then(session => {
+                    console.log('Session created:', session);
+                    
+                    // Success toast
+                    toast({
+                      title: 'Success!',
+                      description: 'New session created. Redirecting to interview page.',
+                    });
+                    
+                    // Navigate to session
+                    setTimeout(() => {
+                      setLocation(`/session/${session.id}`);
+                    }, 500);
+                    
+                  }).catch(error => {
+                    console.error('Failed to create session:', error);
+                    
+                    // Error toast
+                    toast({
+                      title: 'Error creating session',
+                      description: error.message || 'Something went wrong',
+                      variant: 'destructive',
+                    });
+                  });
+                }
               }}
-              disabled={createSessionMutation.isPending}
             >
-              {createSessionMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <PlusCircle className="h-4 w-4 mr-2" />
-              )}
-              {createSessionMutation.isPending ? 'Creating...' : 'New Session'}
-            </Button>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              New Session
+            </button>
           </div>
         )}
       </div>
