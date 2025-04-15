@@ -236,8 +236,8 @@ const SessionRow = ({ session, onViewReport }: SessionRowProps) => {
                       
                       if (result.success) {
                         toast({
-                          title: "Email sent successfully",
-                          description: `The session link has been sent to ${emailTo}`,
+                          title: "Email simulation successful",
+                          description: result.message,
                         });
                         setEmailTo('');
                       } else {
@@ -271,7 +271,7 @@ const SessionRow = ({ session, onViewReport }: SessionRowProps) => {
                   )}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  An email with the session link will be sent to the patient.
+                  This will simulate sending an email. In a production environment, this would connect to an email service to deliver the link to the patient.
                 </p>
               </div>
             </TabsContent>
