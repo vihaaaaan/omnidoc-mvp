@@ -8,6 +8,31 @@ import { apiRequest, getQueryFn, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Session } from '@/types';
 
+// Add a type definition for the SpeechRecognition
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onerror: (event: any) => void;
+  onresult: (event: any) => void;
+  onend: () => void;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 // Voice-to-voice session page
 const SessionLink = () => {
   const { sessionId, token } = useParams();
@@ -16,93 +41,58 @@ const SessionLink = () => {
   // Session state
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
-  const [currentField, setCurrentField] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [patientResponse, setPatientResponse] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [schema, setSchema] = useState<Record<string, string>>({});
   
-  // References for audio
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  // Speech recognition state
+  const [isSpeechRecognitionAvailable, setIsSpeechRecognitionAvailable] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   
   console.log('Session link page loaded with sessionId:', sessionId, 'and token:', token);
   
-  // Check if voice service is available
-  const [isVoiceServiceAvailable, setIsVoiceServiceAvailable] = useState(true);
-  
-  // Determine voice service URL based on environment
-  const getVoiceServiceUrl = () => {
-    if (window.location.hostname === 'localhost') {
-      return 'http://localhost:5001';
-    } else {
-      // Use the same hostname but different port
-      const protocol = window.location.protocol;
-      const hostname = window.location.hostname;
-      return `${protocol}//${hostname}:5001`;
-    }
-  };
-  
-  const voiceServiceUrl = getVoiceServiceUrl();
-  console.log('Voice service URL:', voiceServiceUrl);
-  
-  // Check voice service availability
+  // Setup speech recognition
   useEffect(() => {
-    const checkVoiceService = async () => {
-      try {
-        const response = await fetch(`${voiceServiceUrl}/api/get-schema/test`, { 
-          method: 'GET',
-          signal: AbortSignal.timeout(3000), // 3 second timeout
-        });
-        console.log('Voice service check response:', response.status);
-        setIsVoiceServiceAvailable(response.ok);
-      } catch (error) {
-        console.error('Voice service unavailable:', error);
-        setIsVoiceServiceAvailable(false);
-      }
-    };
+    // Check if the browser supports SpeechRecognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const speechRecognitionAvailable = !!SpeechRecognition;
     
-    checkVoiceService();
-  }, [voiceServiceUrl]);
+    setIsSpeechRecognitionAvailable(speechRecognitionAvailable);
+    
+    if (!speechRecognitionAvailable) {
+      console.warn('Speech Recognition not available in this browser');
+    } else {
+      console.log('Speech Recognition is available');
+    }
+  }, []);
   
   // Start session mutation
   const startSessionMutation = useMutation({
     mutationFn: async () => {
-      if (!isVoiceServiceAvailable) {
-        // If voice service is not available, use a mock response for demo
-        return {
-          session_id: sessionId,
-          current_field: "chief_complaint",
-          question: "What brings you to see the doctor today?",
-          complete: false
-        };
+      try {
+        const response = await apiRequest('GET', `/api/conversation/start/${sessionId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to start session');
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Failed to start session:', error);
+        throw error;
       }
-      
-      const response = await fetch(`${voiceServiceUrl}/api/start-session/${sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to start session');
-      }
-      
-      return response.json();
     },
     onSuccess: (data) => {
       setIsSessionStarted(true);
-      setCurrentField(data.current_field);
       setCurrentQuestion(data.question);
       
-      // Speak the first question if voice service is available
-      if (isVoiceServiceAvailable) {
-        speakText(data.question);
-      }
+      // Speak the first question
+      speakText(data.question);
     },
     onError: (error) => {
+      console.error('Start session error:', error);
       toast({
         title: 'Error',
         description: 'Failed to start session. Please try again.',
@@ -114,113 +104,75 @@ const SessionLink = () => {
   // Process response mutation
   const processResponseMutation = useMutation({
     mutationFn: async (response: string) => {
-      // If voice service is not available, use a mock response flow for demo
-      if (!isVoiceServiceAvailable) {
-        // Simulate fields being filled out one by one
-        const mockFields = ["chief_complaint", "duration", "severity", "location", "quality"];
-        const currentIndex = mockFields.indexOf(currentField as string);
-        const nextIndex = currentIndex + 1;
+      try {
+        const result = await apiRequest('POST', `/api/conversation/respond/${sessionId}`, {
+          response
+        });
         
-        // Create a mock schema for the final state
-        if (nextIndex >= mockFields.length) {
-          const mockSchema: Record<string, string> = {
-            chief_complaint: "Headache",
-            duration: "3 days",
-            severity: "Moderate",
-            location: "Front of head",
-            quality: "Throbbing",
-            alleviating_factors: "Rest and pain medication",
-            aggravating_factors: "Noise and bright light",
-            associated_symptoms: "Nausea",
-            previous_treatment: "Over-the-counter pain relievers",
-            medical_history: "Migraine history",
-            medications: "None",
-            allergies: "None",
-            family_history: "Mother has migraines"
-          };
-          
-          return {
-            complete: true,
-            schema: mockSchema
-          };
+        if (!result.ok) {
+          throw new Error('Failed to process response');
         }
         
-        // Return mock next question
-        const nextField = mockFields[nextIndex];
-        const questions = {
-          duration: "How long have you been experiencing these symptoms?",
-          severity: "On a scale of 1-10, how would you rate the pain?",
-          location: "Where exactly is the pain located?",
-          quality: "How would you describe the nature of the pain? For example, is it sharp, dull, or throbbing?"
-        };
-        
-        return {
-          current_field: nextField,
-          question: questions[nextField as keyof typeof questions],
-          complete: false
-        };
+        return await result.json();
+      } catch (error) {
+        console.error('Failed to process response:', error);
+        throw error;
       }
-      
-      // If voice service is available, use the actual API
-      const res = await fetch(`${voiceServiceUrl}/api/process-response/${sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          response,
-          current_field: currentField,
-        }),
-      });
-      
-      if (!res.ok) {
-        throw new Error('Failed to process response');
-      }
-      
-      return res.json();
     },
     onSuccess: (data) => {
-      if (data.complete) {
+      if (data.isComplete) {
         setIsSessionComplete(true);
-        setSchema(data.schema);
         
-        // Create report via API with error handling
-        try {
-          createReport(data.schema).catch(error => {
-            console.error('Error creating report:', error);
-            toast({
-              title: 'Session Complete',
-              description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
-              variant: 'destructive',
-            });
+        // Get session state to get the schema data
+        apiRequest('GET', `/api/conversation/status/${sessionId}`)
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error('Failed to get session state');
+          })
+          .then(statusData => {
+            setSchema(statusData.state.schema || {});
+            
+            // Create report via API with error handling
+            try {
+              createReport(statusData.state.schema).catch(error => {
+                console.error('Error creating report:', error);
+                toast({
+                  title: 'Session Complete',
+                  description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
+                  variant: 'destructive',
+                });
+              });
+            } catch (error) {
+              console.error('Error creating report:', error);
+              toast({
+                title: 'Session Complete',
+                description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
+                variant: 'destructive',
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Error getting schema:', error);
           });
-        } catch (error) {
-          console.error('Error creating report:', error);
-          toast({
-            title: 'Session Complete',
-            description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
-            variant: 'destructive',
-          });
-        }
         
         toast({
           title: 'Session Complete',
           description: 'Thank you for completing the session. Your information has been recorded.',
         });
       } else {
-        setCurrentField(data.current_field);
         setCurrentQuestion(data.question);
         
-        // Speak the next question if voice service is available
-        if (isVoiceServiceAvailable) {
-          speakText(data.question);
-        }
+        // Speak the next question
+        speakText(data.question);
       }
       
       // Clear the response
       setPatientResponse('');
     },
     onError: (error) => {
+      console.error('Process response error:', error);
       toast({
         title: 'Error',
         description: 'Failed to process your response. Please try again.',
@@ -297,107 +249,95 @@ const SessionLink = () => {
     }
   };
   
-  // Text to speech function
+  // Text to speech function using browser's native Speech Synthesis
   const speakText = async (text: string) => {
     setIsPlaying(true);
     
-    // If voice service is not available, use browser's built-in TTS
-    if (!isVoiceServiceAvailable) {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        utterance.onend = () => {
-          setIsPlaying(false);
-        };
-        
-        speechSynthesis.speak(utterance);
-      } else {
-        // If browser TTS is not available, just set isPlaying to false
-        console.warn('Browser TTS not available');
-        setIsPlaying(false);
-      }
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
       
+      utterance.onend = () => {
+        setIsPlaying(false);
+      };
+      
+      utterance.onerror = () => {
+        console.error('Speech synthesis error');
+        setIsPlaying(false);
+      };
+      
+      speechSynthesis.speak(utterance);
+    } else {
+      // If browser speech synthesis is not available
+      console.warn('Browser TTS not available');
+      setIsPlaying(false);
+      toast({
+        title: 'Speech Not Available',
+        description: 'Your browser does not support text-to-speech. Please read the questions manually.',
+        variant: 'default',
+      });
+    }
+  };
+  
+  // Start speech recognition
+  const startListening = () => {
+    if (!isSpeechRecognitionAvailable) {
+      toast({
+        title: 'Speech Recognition Not Available',
+        description: 'Your browser does not support speech recognition. Please type your response instead.',
+        variant: 'default',
+      });
       return;
     }
     
-    // Try to use the voice service if it's available
-    try {
-      const res = await fetch(`${voiceServiceUrl}/api/text-to-speech`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
-      
-      if (!res.ok) {
-        throw new Error('Failed to convert text to speech');
-      }
-      
-      const audio = new Audio(`${voiceServiceUrl}/temp_audio.wav`);
-      
-      audio.onended = () => {
-        setIsPlaying(false);
-      };
-      
-      audio.play();
-    } catch (error) {
-      console.error('Error playing audio:', error);
-      setIsPlaying(false);
-      
-      // Fallback to browser's TTS if voice service fails
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        speechSynthesis.speak(utterance);
-      }
-    }
-  };
-  
-  // Start recording function
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-      
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      try {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = 'en-US';
         
-        // Convert to base64 for sending to API
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = reader.result as string;
+        recognitionRef.current.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join('');
           
-          // For development: just handle manually entered text
-          // In production, we'd send the audio data to the speech-to-text API
-          // processResponseMutation.mutate(transcribedText);
+          setPatientResponse(transcript);
         };
         
-        // Close the media stream
-        stream.getTracks().forEach(track => track.stop());
-      };
-      
-      mediaRecorderRef.current.start();
-      setIsListening(true);
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      toast({
-        title: 'Microphone Error',
-        description: 'Failed to access microphone. Please check permissions.',
-        variant: 'destructive',
-      });
+        recognitionRef.current.onerror = (event) => {
+          console.error('Speech recognition error:', event);
+          setIsListening(false);
+          toast({
+            title: 'Speech Recognition Error',
+            description: 'There was an error with speech recognition. Please try again or type your response.',
+            variant: 'destructive',
+          });
+        };
+        
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+        
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Failed to start speech recognition:', error);
+        setIsListening(false);
+        toast({
+          title: 'Speech Recognition Error',
+          description: 'Failed to start speech recognition. Please check your microphone permissions.',
+          variant: 'destructive',
+        });
+      }
     }
   };
   
-  // Stop recording function
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isListening) {
-      mediaRecorderRef.current.stop();
+  // Stop speech recognition
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
       setIsListening(false);
     }
   };
@@ -409,11 +349,11 @@ const SessionLink = () => {
     }
   };
   
-  // Cleanup effect
+  // Cleanup speech recognition on unmount
   useEffect(() => {
     return () => {
-      if (mediaRecorderRef.current && isListening) {
-        mediaRecorderRef.current.stop();
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
       }
     };
   }, [isListening]);
@@ -427,9 +367,9 @@ const SessionLink = () => {
             Answer the questions to complete your health screening
           </p>
           
-          {!isVoiceServiceAvailable && (
+          {!isSpeechRecognitionAvailable && (
             <div className="mt-2 text-sm bg-amber-50 text-amber-700 p-2 rounded">
-              <p>Note: Voice service is currently simulated. Text-to-speech using browser capabilities.</p>
+              <p>Note: Speech recognition is not available in your browser. Please type your responses.</p>
             </div>
           )}
         </div>
@@ -515,10 +455,7 @@ const SessionLink = () => {
               
               {sessionData?.patient_id && (
                 <Button asChild className="flex-1 bg-blue-600 hover:bg-blue-700">
-                  <Link href={`/patients/${sessionData.patient_id}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+                  <Link href={`/patients/${sessionData.patient_id}/details`}>
                     View Patient Profile
                   </Link>
                 </Button>
@@ -526,80 +463,116 @@ const SessionLink = () => {
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div>
             {/* Current question display */}
-            <div className="bg-blue-50 p-4 rounded-lg shadow-sm">
-              <p className="text-lg font-medium text-blue-900">{currentQuestion}</p>
-              
-              <div className="flex justify-end mt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => speakText(currentQuestion)}
-                  disabled={isPlaying}
-                >
-                  {isPlaying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                </Button>
+            <div className="bg-blue-50 p-4 rounded-lg mb-6">
+              <div className="flex justify-between">
+                <h3 className="font-medium text-blue-800 mb-2">Question:</h3>
+                <div>
+                  {isPlaying ? (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        if ('speechSynthesis' in window) {
+                          window.speechSynthesis.cancel();
+                          setIsPlaying(false);
+                        }
+                      }}
+                    >
+                      <Square className="h-4 w-4 text-blue-600" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0"
+                      onClick={() => speakText(currentQuestion)}
+                    >
+                      <Play className="h-4 w-4 text-blue-600" />
+                    </Button>
+                  )}
+                </div>
               </div>
+              <p className="text-blue-900">{currentQuestion}</p>
             </div>
             
-            {/* Voice recording controls */}
-            <div className="flex flex-col items-center space-y-4">
-              <div className="flex space-x-4">
-                <Button
-                  variant={isListening ? "destructive" : "default"}
-                  onClick={isListening ? stopRecording : startRecording}
-                  disabled={processResponseMutation.isPending || isPlaying}
-                  className="w-32"
-                >
-                  {isListening ? (
-                    <>
-                      <MicOff className="mr-2 h-4 w-4" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="mr-2 h-4 w-4" />
-                      Record
-                    </>
-                  )}
-                </Button>
+            {/* Patient response section */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-medium text-gray-700">Your Response:</h3>
                 
-                {/* Temporary: While speech recognition is being developed, use text input */}
-                <p className="text-sm text-gray-500 italic">
-                  Voice recording is simulated for this demo
-                </p>
+                {isSpeechRecognitionAvailable && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={isListening ? stopListening : startListening}
+                    className={`h-8 ${isListening ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}
+                  >
+                    {isListening ? (
+                      <>
+                        <MicOff className="h-4 w-4 mr-2" />
+                        Stop Recording
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-4 w-4 mr-2" />
+                        Start Recording
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
               
-              {/* Text input as fallback */}
-              <div className="w-full space-y-2">
+              <div className="relative">
                 <textarea
                   value={patientResponse}
                   onChange={(e) => setPatientResponse(e.target.value)}
-                  placeholder="Type your response here..."
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  rows={3}
-                  disabled={processResponseMutation.isPending || isPlaying}
+                  placeholder="Type your response here or use the microphone..."
+                  className="w-full border rounded-lg p-3 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isListening || processResponseMutation.isPending}
                 />
-                
-                <Button
-                  onClick={handleResponseSubmit}
-                  disabled={!patientResponse.trim() || processResponseMutation.isPending || isPlaying}
-                  className="w-full"
-                >
-                  {processResponseMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  Submit Response
-                </Button>
+                {isListening && (
+                  <div className="absolute inset-0 bg-gray-50 bg-opacity-50 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="mb-2 relative w-16 h-16 mx-auto">
+                        <div className="absolute inset-0 bg-red-100 rounded-full animate-ping opacity-75"></div>
+                        <div className="relative bg-red-200 rounded-full w-16 h-16 flex items-center justify-center">
+                          <Mic className="h-8 w-8 text-red-600" />
+                        </div>
+                      </div>
+                      <p className="text-gray-700">Listening...</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-            
-            {/* Field progress indicator */}
-            <div className="mt-4 text-sm text-gray-500">
-              <p>Current topic: <span className="font-medium capitalize">{currentField?.replace(/_/g, ' ')}</span></p>
+              
+              <div className="flex justify-end gap-2 mt-4">
+                {processResponseMutation.isPending ? (
+                  <Button disabled>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </Button>
+                ) : (
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => setPatientResponse('')}
+                      disabled={!patientResponse.trim() || isListening}
+                    >
+                      Clear
+                    </Button>
+                    <Button 
+                      onClick={handleResponseSubmit}
+                      disabled={!patientResponse.trim() || isListening}
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit Response
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}

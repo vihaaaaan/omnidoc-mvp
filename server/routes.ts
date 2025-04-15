@@ -182,6 +182,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Email endpoint
   apiRouter.post("/send-email", handleSendEmail);
+  
+  // Voice conversation API endpoints
+  apiRouter.get("/conversation/start/:sessionId", async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      
+      // Start a new conversation and get the first question
+      const firstQuestion = await generateFirstQuestion(sessionId);
+      
+      res.json({ 
+        success: true, 
+        question: firstQuestion,
+        sessionId
+      });
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to start conversation',
+        error: String(error)
+      });
+    }
+  });
+  
+  apiRouter.post("/conversation/respond/:sessionId", async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      const { response } = req.body;
+      
+      if (!response || typeof response !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Response is required and must be a string' 
+        });
+      }
+      
+      // Process the response and get the next question
+      const result = await processResponse(sessionId, response);
+      
+      res.json({
+        success: true,
+        question: result.question,
+        isComplete: result.isComplete,
+        sessionId
+      });
+      
+      // If the conversation is complete, generate a report
+      if (result.isComplete) {
+        try {
+          const report = await generateReport(sessionId);
+          
+          // Create a report in the database
+          const dbSession = await storage.getSessionById(sessionId);
+          if (dbSession) {
+            // Update session status to completed
+            await storage.updateSessionStatus(sessionId, 'completed');
+            
+            // Create report
+            await storage.createReport({
+              session_id: sessionId,
+              summary: report.summary,
+              json_schema: report.structured
+            });
+          }
+        } catch (reportError) {
+          console.error('Error generating report:', reportError);
+          // Continue with the response, just log the error
+        }
+      }
+    } catch (error) {
+      console.error('Error processing response:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to process response',
+        error: String(error)
+      });
+    }
+  });
+  
+  apiRouter.get("/conversation/status/:sessionId", async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      const state = getSessionState(sessionId);
+      
+      if (!state) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Session not found' 
+        });
+      }
+      
+      res.json({
+        success: true,
+        state,
+        sessionId
+      });
+    } catch (error) {
+      console.error('Error getting session state:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to get session state',
+        error: String(error)
+      });
+    }
+  });
 
   // Create HTTP server
   const httpServer = createServer(app);
