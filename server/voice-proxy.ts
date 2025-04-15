@@ -10,40 +10,40 @@ let servicePort = 5001;
 let serviceHost = 'localhost';
 
 // Try to start the voice service in the background
-export function startVoiceService() {
+export async function startVoiceService(): Promise<boolean> {
   try {
     // Check if process already running
-    try {
-      execSync('pgrep -f "python voice_api.py"');
+    if (checkVoiceService()) {
       console.log('Voice service is already running');
-      voiceServiceRunning = true;
       return true;
-    } catch (error) {
-      // Process not running, continue to start it
     }
 
     // Check if voice_api.py exists
     if (!existsSync('./voice_api.py')) {
-      console.error('voice_api.py not found');
-      return false;
+      console.error('voice_api.py not found in current directory');
+      
+      // Try alternative location
+      if (existsSync('./server/voice_api.py')) {
+        console.log('Found voice_api.py in server directory');
+        execSync('nohup python ./server/voice_api.py > voice_service.log 2>&1 &');
+      } else {
+        return false;
+      }
+    } else {
+      // Start the voice service in the background
+      execSync('nohup python voice_api.py > voice_service.log 2>&1 &');
     }
-
-    // Start the voice service in the background
-    execSync('nohup python voice_api.py > voice_service.log 2>&1 &');
+    
     console.log('Voice service started in the background');
     
     // Give it a moment to start
-    setTimeout(() => {
-      try {
-        execSync('pgrep -f "python voice_api.py"');
-        voiceServiceRunning = true;
-        console.log('Voice service confirmed running');
-      } catch (error) {
-        console.error('Failed to confirm voice service is running');
-      }
-    }, 2000);
-    
-    return true;
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const running = checkVoiceService();
+        console.log('Voice service running check:', running);
+        resolve(running);
+      }, 2000);
+    });
   } catch (error) {
     console.error('Failed to start voice service:', error);
     return false;
@@ -53,10 +53,20 @@ export function startVoiceService() {
 // Check if the voice service is running
 export function checkVoiceService(): boolean {
   try {
-    execSync('pgrep -f "python voice_api.py"');
-    voiceServiceRunning = true;
-    return true;
+    const output = execSync('pgrep -f "python voice_api.py"', { encoding: 'utf-8' });
+    
+    // If we get output and it contains numbers, assume the service is running
+    if (output && output.trim().length > 0) {
+      console.log('Voice service process found with PID:', output.trim());
+      voiceServiceRunning = true;
+      return true;
+    } else {
+      console.log('No voice service process found by pgrep');
+      voiceServiceRunning = false;
+      return false;
+    }
   } catch (error) {
+    console.log('Voice service is not running');
     voiceServiceRunning = false;
     return false;
   }
