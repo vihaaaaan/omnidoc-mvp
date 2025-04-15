@@ -85,16 +85,20 @@ const SessionLink = () => {
   const startSessionMutation = useMutation({
     mutationFn: async () => {
       try {
-        // Include useElevenLabs parameter to get high-quality TTS audio
+        console.log('Starting session with ID:', sessionId);
+        
+        // Always use ElevenLabs for high-quality TTS audio
         const response = await apiRequest('GET', 
-          `/api/conversation/start/${sessionId}?useElevenLabs=${useElevenLabs}`
+          `/api/conversation/start/${sessionId}?useElevenLabs=true`
         );
         
         if (!response.ok) {
           throw new Error('Failed to start session');
         }
         
-        return await response.json();
+        const responseData = await response.json();
+        console.log('Session started successfully with data:', responseData);
+        return responseData;
       } catch (error) {
         console.error('Failed to start session:', error);
         throw error;
@@ -106,13 +110,20 @@ const SessionLink = () => {
       
       // Store audio URL for ElevenLabs playback if available
       if (data.audioUrl) {
-        setAudioUrl(data.audioUrl);
+        console.log('Setting audio URL from start session response:', data.audioUrl);
+        // Make sure we use the full URL with the server
+        const fullAudioUrl = new URL(data.audioUrl, window.location.origin).toString();
+        console.log('Full audio URL:', fullAudioUrl);
+        setAudioUrl(fullAudioUrl);
       } else {
+        console.warn('No audio URL returned from session start');
         setAudioUrl(null);
       }
       
-      // Speak the first question
-      speakText(data.question);
+      // Speak the first question after a short delay to ensure audioUrl is set
+      setTimeout(() => {
+        speakText(data.question);
+      }, 100);
     },
     onError: (error) => {
       console.error('Start session error:', error);
@@ -128,17 +139,21 @@ const SessionLink = () => {
   const processResponseMutation = useMutation({
     mutationFn: async (response: string) => {
       try {
-        // Include useElevenLabs parameter to get high-quality TTS audio
+        console.log('Processing response for session ID:', sessionId);
+        
+        // Always use ElevenLabs for high-quality TTS audio
         const result = await apiRequest('POST', `/api/conversation/respond/${sessionId}`, {
           response,
-          useElevenLabs: useElevenLabs
+          useElevenLabs: true
         });
         
         if (!result.ok) {
           throw new Error('Failed to process response');
         }
         
-        return await result.json();
+        const responseData = await result.json();
+        console.log('Response processed successfully with data:', responseData);
+        return responseData;
       } catch (error) {
         console.error('Failed to process response:', error);
         throw error;
@@ -191,13 +206,20 @@ const SessionLink = () => {
         
         // Store audio URL for ElevenLabs playback if available
         if (data.audioUrl) {
-          setAudioUrl(data.audioUrl);
+          console.log('Setting audio URL from process response:', data.audioUrl);
+          // Make sure we use the full URL with the server
+          const fullAudioUrl = new URL(data.audioUrl, window.location.origin).toString();
+          console.log('Full audio URL:', fullAudioUrl);
+          setAudioUrl(fullAudioUrl);
         } else {
+          console.warn('No audio URL returned from process response');
           setAudioUrl(null);
         }
         
-        // Speak the next question
-        speakText(data.question);
+        // Speak the next question after a short delay to ensure audioUrl is set
+        setTimeout(() => {
+          speakText(data.question);
+        }, 100);
       }
       
       // Clear the response
