@@ -57,7 +57,8 @@ const SessionLink = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [schema, setSchema] = useState<Record<string, string>>({});
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [useElevenLabs, setUseElevenLabs] = useState(true); // Enable ElevenLabs by default
+  // Always use ElevenLabs for high-quality voice
+  const useElevenLabs = true;
   
   // Speech recognition state
   const [isSpeechRecognitionAvailable, setIsSpeechRecognitionAvailable] = useState(false);
