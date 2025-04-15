@@ -151,5 +151,223 @@ export class MemStorage implements IStorage {
   }
 }
 
+// Import PostgreSQL and session handling
+import { Pool } from 'pg';
+import connectPg from 'connect-pg-simple';
+import session from 'express-session';
+
+// Database Storage implementation
+export class DatabaseStorage implements IStorage {
+  private pool: Pool;
+  public sessionStore: session.SessionStore;
+
+  constructor() {
+    this.pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+    });
+    
+    const PostgresSessionStore = connectPg(session);
+    this.sessionStore = new PostgresSessionStore({ 
+      pool: this.pool, 
+      createTableIfMissing: true 
+    });
+    
+    console.log("Database connection established");
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    try {
+      const result = await this.pool.query(
+        'SELECT * FROM users WHERE id = $1',
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return undefined;
+    }
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    try {
+      const result = await this.pool.query(
+        'SELECT * FROM users WHERE username = $1',
+        [username]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting user by username:', error);
+      return undefined;
+    }
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const { username, password } = insertUser;
+    try {
+      const result = await this.pool.query(
+        'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *',
+        [username, password]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  }
+
+  // Patient methods
+  async getPatients(): Promise<Patient[]> {
+    try {
+      const result = await this.pool.query('SELECT * FROM patients ORDER BY full_name');
+      return result.rows;
+    } catch (error) {
+      console.error('Error getting patients:', error);
+      return [];
+    }
+  }
+
+  async getPatientById(id: string): Promise<Patient | undefined> {
+    try {
+      const result = await this.pool.query(
+        'SELECT * FROM patients WHERE id = $1',
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting patient by ID:', error);
+      return undefined;
+    }
+  }
+
+  async createPatient(insertPatient: InsertPatient): Promise<Patient> {
+    const { full_name, email, phone_number, dob, gender, address } = insertPatient;
+    try {
+      const result = await this.pool.query(
+        'INSERT INTO patients (full_name, email, phone_number, dob, gender, address) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [full_name, email, phone_number, dob, gender || null, address || null]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error creating patient:', error);
+      throw error;
+    }
+  }
+
+  // Session methods
+  async getSessions(): Promise<Session[]> {
+    try {
+      const result = await this.pool.query('SELECT * FROM sessions ORDER BY started_at DESC');
+      return result.rows;
+    } catch (error) {
+      console.error('Error getting sessions:', error);
+      return [];
+    }
+  }
+
+  async getSessionById(id: string): Promise<Session | undefined> {
+    try {
+      const result = await this.pool.query(
+        'SELECT * FROM sessions WHERE id = $1',
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting session by ID:', error);
+      return undefined;
+    }
+  }
+
+  async getSessionsByPatientId(patientId: string): Promise<Session[]> {
+    try {
+      const result = await this.pool.query(
+        'SELECT * FROM sessions WHERE patient_id = $1 ORDER BY started_at DESC',
+        [patientId]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error getting sessions by patient ID:', error);
+      return [];
+    }
+  }
+
+  async createSession(insertSession: InsertSession): Promise<Session> {
+    const { patient_id, status = 'pending' } = insertSession;
+    try {
+      const result = await this.pool.query(
+        'INSERT INTO sessions (patient_id, status) VALUES ($1, $2) RETURNING *',
+        [patient_id, status]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error creating session:', error);
+      throw error;
+    }
+  }
+
+  async updateSessionStatus(id: string, status: string): Promise<Session | undefined> {
+    try {
+      let result;
+      if (status === 'completed') {
+        result = await this.pool.query(
+          'UPDATE sessions SET status = $1, completed_at = NOW() WHERE id = $2 RETURNING *',
+          [status, id]
+        );
+      } else {
+        result = await this.pool.query(
+          'UPDATE sessions SET status = $1 WHERE id = $2 RETURNING *',
+          [status, id]
+        );
+      }
+      
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error updating session status:', error);
+      return undefined;
+    }
+  }
+
+  // Report methods
+  async getReportById(id: string): Promise<Report | undefined> {
+    try {
+      const result = await this.pool.query(
+        'SELECT * FROM reports WHERE id = $1',
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting report by ID:', error);
+      return undefined;
+    }
+  }
+
+  async getReportBySessionId(sessionId: string): Promise<Report | undefined> {
+    try {
+      const result = await this.pool.query(
+        'SELECT * FROM reports WHERE session_id = $1',
+        [sessionId]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting report by session ID:', error);
+      return undefined;
+    }
+  }
+
+  async createReport(insertReport: InsertReport): Promise<Report> {
+    const { session_id, summary, json_schema } = insertReport;
+    try {
+      const result = await this.pool.query(
+        'INSERT INTO reports (session_id, summary, json_schema) VALUES ($1, $2, $3) RETURNING *',
+        [session_id, summary, json_schema]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error creating report:', error);
+      throw error;
+    }
+  }
+}
+
 // Export a single instance to be used throughout the app
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
