@@ -399,8 +399,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const audioBuffer = await textToSpeech(text, voiceId);
       console.log(`Generated audio buffer with size: ${audioBuffer.length} bytes`);
       
-      // Send the audio buffer directly (already a Buffer)
+      // Enhanced headers for maximum browser compatibility with autoplay
       res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', audioBuffer.length.toString());
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
+      res.setHeader('X-Audio-Type', 'elevenlabs');
+      
+      // Send the audio buffer directly (already a Buffer)
       res.send(audioBuffer);
     } catch (error) {
       console.error('Error generating text-to-speech via direct endpoint:', error);
