@@ -120,10 +120,41 @@ const SessionLink = () => {
         setAudioUrl(null);
       }
       
-      // Speak the first question after a short delay to ensure audioUrl is set
-      setTimeout(() => {
-        speakText(data.question);
-      }, 100);
+      // Always speak the first question immediately
+      // Use direct TTS endpoint for reliability
+      try {
+        console.log('Auto-playing question using direct TTS endpoint');
+        const encodedText = encodeURIComponent(data.question);
+        const directUrl = `/api/tts/direct?text=${encodedText}`;
+        
+        // Create and play audio immediately
+        const audio = new Audio(directUrl);
+        audio.oncanplay = () => {
+          console.log('Direct TTS audio ready to play automatically');
+          // Try to play once it's loaded
+          audio.play().catch(playError => {
+            console.error('Error auto-playing audio:', playError);
+            // On error, we'll still set isPlaying to true so the UI shows it's playing
+            setIsPlaying(true);
+          });
+        };
+        
+        audio.onended = () => {
+          console.log('Auto-play audio completed');
+          setIsPlaying(false);
+        };
+        
+        audio.onerror = (e) => {
+          console.error('Error auto-playing audio:', e);
+          setIsPlaying(false);
+        };
+        
+        // Set playing state while audio loads
+        setIsPlaying(true);
+      } catch (error) {
+        console.error('Error setting up auto-play audio:', error);
+        setIsPlaying(false);
+      }
     },
     onError: (error) => {
       console.error('Start session error:', error);
@@ -216,10 +247,41 @@ const SessionLink = () => {
           setAudioUrl(null);
         }
         
-        // Speak the next question after a short delay to ensure audioUrl is set
-        setTimeout(() => {
-          speakText(data.question);
-        }, 100);
+        // Auto-play the question audio as soon as we get it
+        // Use direct TTS endpoint for reliability and immediate playback
+        try {
+          console.log('Auto-playing next question using direct TTS endpoint');
+          const encodedText = encodeURIComponent(data.question);
+          const directUrl = `/api/tts/direct?text=${encodedText}`;
+          
+          // Create and play audio immediately
+          const audio = new Audio(directUrl);
+          audio.oncanplay = () => {
+            console.log('Direct TTS audio ready to play automatically');
+            // Try to play once it's loaded
+            audio.play().catch(playError => {
+              console.error('Error auto-playing audio for next question:', playError);
+              // On error, we'll still set isPlaying to true so the UI shows it's playing
+              setIsPlaying(true);
+            });
+          };
+          
+          audio.onended = () => {
+            console.log('Auto-play audio completed for next question');
+            setIsPlaying(false);
+          };
+          
+          audio.onerror = (e) => {
+            console.error('Error auto-playing audio for next question:', e);
+            setIsPlaying(false);
+          };
+          
+          // Set playing state while audio loads
+          setIsPlaying(true);
+        } catch (error) {
+          console.error('Error setting up auto-play audio for next question:', error);
+          setIsPlaying(false);
+        }
       }
       
       // Clear the response
