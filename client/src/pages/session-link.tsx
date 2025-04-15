@@ -56,6 +56,8 @@ const SessionLink = () => {
   const [isListening, setIsListening] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [schema, setSchema] = useState<Record<string, string>>({});
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [useElevenLabs, setUseElevenLabs] = useState(true); // Enable ElevenLabs by default
   
   // Speech recognition state
   const [isSpeechRecognitionAvailable, setIsSpeechRecognitionAvailable] = useState(false);
@@ -82,7 +84,10 @@ const SessionLink = () => {
   const startSessionMutation = useMutation({
     mutationFn: async () => {
       try {
-        const response = await apiRequest('GET', `/api/conversation/start/${sessionId}`);
+        // Include useElevenLabs parameter to get high-quality TTS audio
+        const response = await apiRequest('GET', 
+          `/api/conversation/start/${sessionId}?useElevenLabs=${useElevenLabs}`
+        );
         
         if (!response.ok) {
           throw new Error('Failed to start session');
@@ -97,6 +102,13 @@ const SessionLink = () => {
     onSuccess: (data) => {
       setIsSessionStarted(true);
       setCurrentQuestion(data.question);
+      
+      // Store audio URL for ElevenLabs playback if available
+      if (data.audioUrl) {
+        setAudioUrl(data.audioUrl);
+      } else {
+        setAudioUrl(null);
+      }
       
       // Speak the first question
       speakText(data.question);
@@ -115,8 +127,10 @@ const SessionLink = () => {
   const processResponseMutation = useMutation({
     mutationFn: async (response: string) => {
       try {
+        // Include useElevenLabs parameter to get high-quality TTS audio
         const result = await apiRequest('POST', `/api/conversation/respond/${sessionId}`, {
-          response
+          response,
+          useElevenLabs: useElevenLabs
         });
         
         if (!result.ok) {
@@ -173,6 +187,13 @@ const SessionLink = () => {
         });
       } else {
         setCurrentQuestion(data.question);
+        
+        // Store audio URL for ElevenLabs playback if available
+        if (data.audioUrl) {
+          setAudioUrl(data.audioUrl);
+        } else {
+          setAudioUrl(null);
+        }
         
         // Speak the next question
         speakText(data.question);
@@ -287,10 +308,40 @@ const SessionLink = () => {
     }
   };
   
-  // Text to speech function using browser's native Speech Synthesis
+  // Text to speech function with ElevenLabs for high-quality voice
   const speakText = async (text: string) => {
     setIsPlaying(true);
     
+    try {
+      // Check if there's an audioUrl in the response data
+      // If so, we can play the ElevenLabs audio
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        
+        audio.onended = () => {
+          setIsPlaying(false);
+        };
+        
+        audio.onerror = () => {
+          console.error('Error playing ElevenLabs audio');
+          setIsPlaying(false);
+          fallbackToNativeTTS(text);
+        };
+        
+        await audio.play();
+      } else {
+        // If no ElevenLabs audio URL is available, fall back to browser TTS
+        fallbackToNativeTTS(text);
+      }
+    } catch (error) {
+      console.error('Error with ElevenLabs audio playback:', error);
+      setIsPlaying(false);
+      fallbackToNativeTTS(text);
+    }
+  };
+    
+  // Fallback to browser's native speech synthesis if ElevenLabs is unavailable
+  const fallbackToNativeTTS = (text: string) => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       
@@ -310,7 +361,7 @@ const SessionLink = () => {
       setIsPlaying(false);
       toast({
         title: 'Speech Not Available',
-        description: 'Your browser does not support text-to-speech. Please read the questions manually.',
+        description: 'Text-to-speech is unavailable. Please read the questions manually.',
         variant: 'default',
       });
     }
