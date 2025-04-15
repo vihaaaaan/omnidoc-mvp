@@ -761,6 +761,15 @@ const SessionLink = () => {
 
         recognitionRef.current.onend = () => {
           setIsListening(false);
+          
+          // Wait a small moment to ensure the final transcript is processed
+          setTimeout(() => {
+            // Check if we have a response and automatically submit it
+            if (patientResponse.trim()) {
+              console.log('Speech recognition ended, auto-submitting response');
+              processResponseMutation.mutate(patientResponse);
+            }
+          }, 300);
         };
 
         recognitionRef.current.start();
@@ -778,11 +787,18 @@ const SessionLink = () => {
     }
   };
 
-  // Stop speech recognition
+  // Stop speech recognition and automatically submit the response
   const stopListening = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
+      
+      // Add a small delay to ensure the final transcript is captured
+      setTimeout(() => {
+        if (patientResponse.trim()) {
+          processResponseMutation.mutate(patientResponse);
+        }
+      }, 200);
     }
   };
 
@@ -806,7 +822,7 @@ const SessionLink = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-5">
       <Card className="w-full max-w-2xl p-6 shadow-lg">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold">Welcome to OmniDoc</h1>
+          <h1 className="text-2xl font-bold">Welcome to omnidoc</h1>
           <p className="text-gray-600 mt-2">
             Please answer the following questions to the best of your ability to
             give your healthcare provider more context about your visit!
