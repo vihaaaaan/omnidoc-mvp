@@ -13,6 +13,14 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Session } from '@/types';
 
+// Add global declarations for window properties we're adding
+declare global {
+  interface Window {
+    sessionAudio?: HTMLAudioElement;
+    currentAudio?: HTMLAudioElement;
+  }
+}
+
 // Add a type definition for the SpeechRecognition
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
@@ -122,39 +130,73 @@ const SessionLink = () => {
       
       // Always speak the first question immediately
       // Use direct TTS endpoint for reliability
-      try {
-        console.log('Auto-playing question using direct TTS endpoint');
-        const encodedText = encodeURIComponent(data.question);
-        const directUrl = `/api/tts/direct?text=${encodedText}`;
-        
-        // Create and play audio immediately
-        const audio = new Audio(directUrl);
-        audio.oncanplay = () => {
-          console.log('Direct TTS audio ready to play automatically');
-          // Try to play once it's loaded
-          audio.play().catch(playError => {
-            console.error('Error auto-playing audio:', playError);
-            // On error, we'll still set isPlaying to true so the UI shows it's playing
-            setIsPlaying(true);
+      (function playAudioImmediately() {
+        try {
+          console.log('Auto-playing question using direct TTS endpoint');
+          const encodedText = encodeURIComponent(data.question);
+          const directUrl = `/api/tts/direct?text=${encodedText}`;
+          
+          // Set playing state immediately
+          setIsPlaying(true);
+          
+          // Create a POST request to generate audio in advance
+          fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: data.question })
+          })
+          .then(response => {
+            if (!response.ok) throw new Error('Failed to generate audio');
+            return response.arrayBuffer();
+          })
+          .then(arrayBuffer => {
+            // Create a blob from the array buffer
+            const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+            const objectURL = URL.createObjectURL(blob);
+            
+            // Create audio element with the blob URL
+            const audio = new Audio(objectURL);
+            
+            // Add event listeners
+            audio.addEventListener('ended', () => {
+              console.log('Audio playback completed');
+              setIsPlaying(false);
+              // Clean up object URL
+              URL.revokeObjectURL(objectURL);
+            });
+            
+            audio.addEventListener('canplaythrough', () => {
+              console.log('Audio can play through, starting playback');
+              // Start playback
+              audio.play().catch(playError => {
+                console.error('Error starting audio playback:', playError);
+                setIsPlaying(false);
+              });
+            });
+            
+            // Set preload to auto to start loading immediately
+            audio.preload = 'auto';
+            
+            // Store reference to the audio element
+            window.sessionAudio = audio;
+          })
+          .catch(error => {
+            console.error('Error with direct audio generation approach:', error);
+            setIsPlaying(false);
+            
+            // Fall back to the direct URL approach
+            const fallbackAudio = new Audio(directUrl);
+            fallbackAudio.onended = () => setIsPlaying(false);
+            fallbackAudio.play().catch(e => {
+              console.error('Fallback audio playback failed:', e);
+              setIsPlaying(false);
+            });
           });
-        };
-        
-        audio.onended = () => {
-          console.log('Auto-play audio completed');
+        } catch (error) {
+          console.error('Error setting up auto-play audio:', error);
           setIsPlaying(false);
-        };
-        
-        audio.onerror = (e) => {
-          console.error('Error auto-playing audio:', e);
-          setIsPlaying(false);
-        };
-        
-        // Set playing state while audio loads
-        setIsPlaying(true);
-      } catch (error) {
-        console.error('Error setting up auto-play audio:', error);
-        setIsPlaying(false);
-      }
+        }
+      })();
     },
     onError: (error) => {
       console.error('Start session error:', error);
@@ -249,39 +291,99 @@ const SessionLink = () => {
         
         // Auto-play the question audio as soon as we get it
         // Use direct TTS endpoint for reliability and immediate playback
-        try {
-          console.log('Auto-playing next question using direct TTS endpoint');
-          const encodedText = encodeURIComponent(data.question);
-          const directUrl = `/api/tts/direct?text=${encodedText}`;
-          
-          // Create and play audio immediately
-          const audio = new Audio(directUrl);
-          audio.oncanplay = () => {
-            console.log('Direct TTS audio ready to play automatically');
-            // Try to play once it's loaded
-            audio.play().catch(playError => {
-              console.error('Error auto-playing audio for next question:', playError);
-              // On error, we'll still set isPlaying to true so the UI shows it's playing
-              setIsPlaying(true);
+        (function playNextQuestionImmediately() {
+          try {
+            console.log('Auto-playing next question using direct TTS endpoint');
+            // Set playing state immediately
+            setIsPlaying(true);
+            
+            // Create a POST request to generate audio in advance
+            fetch('/api/tts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: data.question })
+            })
+            .then(response => {
+              if (!response.ok) throw new Error('Failed to generate audio');
+              return response.arrayBuffer();
+            })
+            .then(arrayBuffer => {
+              // Create a blob from the array buffer
+              const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+              const objectURL = URL.createObjectURL(blob);
+              
+              console.log('Created object URL for audio blob:', objectURL);
+              
+              // Create audio element with the blob URL
+              const audio = new Audio(objectURL);
+              
+              // Add event listeners
+              audio.addEventListener('ended', () => {
+                console.log('Follow-up audio playback completed');
+                setIsPlaying(false);
+                // Clean up object URL
+                URL.revokeObjectURL(objectURL);
+              });
+              
+              audio.addEventListener('canplaythrough', () => {
+                console.log('Follow-up audio can play through, starting playback');
+                // Start playback
+                audio.play().catch(playError => {
+                  console.error('Error starting follow-up audio playback:', playError);
+                  setIsPlaying(false);
+                });
+              });
+              
+              // Force audio loading
+              audio.load();
+              
+              // Set preload to auto to start loading immediately
+              audio.preload = 'auto';
+              
+              // Store reference to the audio element and try to play
+              setTimeout(() => {
+                console.log('Attempting to play follow-up audio after timeout');
+                audio.play().catch(e => console.error('Timeout play attempt failed:', e));
+              }, 300);
+              
+              // Store reference for cleanup
+              window.sessionAudio = audio;
+            })
+            .catch(error => {
+              console.error('Error with direct follow-up audio generation:', error);
+              
+              // Fall back to the direct URL approach
+              const encodedText = encodeURIComponent(data.question);
+              const directUrl = `/api/tts/direct?text=${encodedText}`;
+              
+              console.log('Falling back to direct URL for follow-up question:', directUrl);
+              const fallbackAudio = new Audio(directUrl);
+              
+              fallbackAudio.onended = () => {
+                console.log('Fallback follow-up audio ended');
+                setIsPlaying(false);
+              };
+              
+              fallbackAudio.onerror = () => {
+                console.error('Fallback follow-up audio failed');
+                setIsPlaying(false);
+              };
+              
+              fallbackAudio.oncanplaythrough = () => {
+                console.log('Fallback follow-up audio can play through');
+                fallbackAudio.play().catch(e => {
+                  console.error('Fallback follow-up play failed:', e);
+                  setIsPlaying(false);
+                });
+              };
+              
+              fallbackAudio.load();
             });
-          };
-          
-          audio.onended = () => {
-            console.log('Auto-play audio completed for next question');
+          } catch (error) {
+            console.error('Error setting up auto-play for follow-up audio:', error);
             setIsPlaying(false);
-          };
-          
-          audio.onerror = (e) => {
-            console.error('Error auto-playing audio for next question:', e);
-            setIsPlaying(false);
-          };
-          
-          // Set playing state while audio loads
-          setIsPlaying(true);
-        } catch (error) {
-          console.error('Error setting up auto-play audio for next question:', error);
-          setIsPlaying(false);
-        }
+          }
+        })();
       }
       
       // Clear the response
