@@ -16,8 +16,11 @@ interface Voice {
 // Some recommended professional voices for medical context:
 // - "Adam" - 'pNInz6obpgDQGcFmaJgB' (Male, professional)
 // - "Rachel" - '21m00Tcm4TlvDq8ikWAM' (Female, warm, professional)
+// - "Bella" - 'EXAVITQu4vr4xnSDxMaL' (Female, gentle, soft-spoken)
+// - "Grace" - 'oWAxZDx7w5VEj9dCyTzz' (Female, warm, nurturing)
+// - "Elli" - 'MF3mGyEYCl7XYWbV9V6O' (Female, professional, clear)
 // - "Daniel" - 'onwK4e9ZLuTAKqWW03F9' (Male, calm, authoritative)
-const VOICE_ID = 'pNInz6obpgDQGcFmaJgB'; // Adam voice by default
+const VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'; // Bella voice - gentle, soft-spoken, feminine
 const MODEL_ID = 'eleven_multilingual_v2'; // Multilingual model for better pronunciation of medical terms
 
 // Use direct API calls instead of the problematic SDK
@@ -80,7 +83,7 @@ async function makeElevenLabsRequest(
 /**
  * Convert text to speech using ElevenLabs API
  * @param text The text to convert to speech
- * @param voiceId Optional voice ID to use (defaults to Adam)
+ * @param voiceId Optional voice ID to use (defaults to Bella - soft, feminine voice)
  * @returns Buffer containing audio data
  */
 export async function textToSpeech(
@@ -95,9 +98,9 @@ export async function textToSpeech(
       text,
       model_id: MODEL_ID,
       voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-        style: 0.0, // Neutral style for medical context
+        stability: 0.65,        // Slightly higher stability for a smoother tone
+        similarity_boost: 0.8,  // Higher similarity for more consistent voice quality
+        style: 0.05,            // Very slight style to make it warmer and more empathetic
         use_speaker_boost: true
       }
     };
