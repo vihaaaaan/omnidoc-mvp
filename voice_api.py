@@ -340,5 +340,30 @@ def get_schema(session_id):
     schema = load_schema(session_id)
     return jsonify(schema)
 
+# Create a sample schema.json file if it doesn't exist
+if not os.path.exists(SCHEMA_PATH):
+    default_schema = {
+        "chief_complaint": "",
+        "duration": "",
+        "severity": "",
+        "location": "",
+        "quality": "",
+        "alleviating_factors": "",
+        "aggravating_factors": "",
+        "associated_symptoms": "",
+        "previous_treatment": "",
+        "medical_history": "",
+        "medications": "",
+        "allergies": "",
+        "family_history": ""
+    }
+    
+    with open(SCHEMA_PATH, "w") as f:
+        json.dump(default_schema, f, indent=2)
+    
+    print(f"Created schema template at {SCHEMA_PATH}")
+
 if __name__ == '__main__':
+    print("Starting Voice API service on port 5001...")
+    print(f"Using Groq API key: {'*' * len(GROQ_API_KEY) if GROQ_API_KEY else 'Not found! Set GROQ_API_KEY in .env'}")
     app.run(host='0.0.0.0', port=5001, debug=True)

@@ -28,9 +28,40 @@ const SessionLink = () => {
   
   console.log('Session link page loaded with sessionId:', sessionId, 'and token:', token);
   
+  // Check if voice service is available
+  const [isVoiceServiceAvailable, setIsVoiceServiceAvailable] = useState(true);
+  
+  // Check voice service availability
+  useEffect(() => {
+    const checkVoiceService = async () => {
+      try {
+        const response = await fetch('http://localhost:5001/api/get-schema/test', { 
+          method: 'GET',
+          signal: AbortSignal.timeout(3000), // 3 second timeout
+        });
+        setIsVoiceServiceAvailable(response.ok);
+      } catch (error) {
+        console.error('Voice service unavailable:', error);
+        setIsVoiceServiceAvailable(false);
+      }
+    };
+    
+    checkVoiceService();
+  }, []);
+  
   // Start session mutation
   const startSessionMutation = useMutation({
     mutationFn: async () => {
+      if (!isVoiceServiceAvailable) {
+        // If voice service is not available, use a mock response for demo
+        return {
+          session_id: sessionId,
+          current_field: "chief_complaint",
+          question: "What brings you to see the doctor today?",
+          complete: false
+        };
+      }
+      
       const response = await fetch(`http://localhost:5001/api/start-session/${sessionId}`, {
         method: 'POST',
         headers: {
@@ -49,8 +80,10 @@ const SessionLink = () => {
       setCurrentField(data.current_field);
       setCurrentQuestion(data.question);
       
-      // Speak the first question
-      speakText(data.question);
+      // Speak the first question if voice service is available
+      if (isVoiceServiceAvailable) {
+        speakText(data.question);
+      }
     },
     onError: (error) => {
       toast({
@@ -64,6 +97,54 @@ const SessionLink = () => {
   // Process response mutation
   const processResponseMutation = useMutation({
     mutationFn: async (response: string) => {
+      // If voice service is not available, use a mock response flow for demo
+      if (!isVoiceServiceAvailable) {
+        // Simulate fields being filled out one by one
+        const mockFields = ["chief_complaint", "duration", "severity", "location", "quality"];
+        const currentIndex = mockFields.indexOf(currentField as string);
+        const nextIndex = currentIndex + 1;
+        
+        // Create a mock schema for the final state
+        if (nextIndex >= mockFields.length) {
+          const mockSchema: Record<string, string> = {
+            chief_complaint: "Headache",
+            duration: "3 days",
+            severity: "Moderate",
+            location: "Front of head",
+            quality: "Throbbing",
+            alleviating_factors: "Rest and pain medication",
+            aggravating_factors: "Noise and bright light",
+            associated_symptoms: "Nausea",
+            previous_treatment: "Over-the-counter pain relievers",
+            medical_history: "Migraine history",
+            medications: "None",
+            allergies: "None",
+            family_history: "Mother has migraines"
+          };
+          
+          return {
+            complete: true,
+            schema: mockSchema
+          };
+        }
+        
+        // Return mock next question
+        const nextField = mockFields[nextIndex];
+        const questions = {
+          duration: "How long have you been experiencing these symptoms?",
+          severity: "On a scale of 1-10, how would you rate the pain?",
+          location: "Where exactly is the pain located?",
+          quality: "How would you describe the nature of the pain? For example, is it sharp, dull, or throbbing?"
+        };
+        
+        return {
+          current_field: nextField,
+          question: questions[nextField as keyof typeof questions],
+          complete: false
+        };
+      }
+      
+      // If voice service is available, use the actual API
       const res = await fetch(`http://localhost:5001/api/process-response/${sessionId}`, {
         method: 'POST',
         headers: {
@@ -97,8 +178,10 @@ const SessionLink = () => {
         setCurrentField(data.current_field);
         setCurrentQuestion(data.question);
         
-        // Speak the next question
-        speakText(data.question);
+        // Speak the next question if voice service is available
+        if (isVoiceServiceAvailable) {
+          speakText(data.question);
+        }
       }
       
       // Clear the response
@@ -140,9 +223,29 @@ const SessionLink = () => {
   
   // Text to speech function
   const speakText = async (text: string) => {
-    try {
-      setIsPlaying(true);
+    setIsPlaying(true);
+    
+    // If voice service is not available, use browser's built-in TTS
+    if (!isVoiceServiceAvailable) {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        utterance.onend = () => {
+          setIsPlaying(false);
+        };
+        
+        speechSynthesis.speak(utterance);
+      } else {
+        // If browser TTS is not available, just set isPlaying to false
+        console.warn('Browser TTS not available');
+        setIsPlaying(false);
+      }
       
+      return;
+    }
+    
+    // Try to use the voice service if it's available
+    try {
       const res = await fetch('http://localhost:5001/api/text-to-speech', {
         method: 'POST',
         headers: {
@@ -166,7 +269,7 @@ const SessionLink = () => {
       console.error('Error playing audio:', error);
       setIsPlaying(false);
       
-      // Fallback to browser's TTS if available
+      // Fallback to browser's TTS if voice service fails
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
         speechSynthesis.speak(utterance);
@@ -247,6 +350,12 @@ const SessionLink = () => {
           <p className="text-gray-600 mt-2">
             Answer the questions to complete your health screening
           </p>
+          
+          {!isVoiceServiceAvailable && (
+            <div className="mt-2 text-sm bg-amber-50 text-amber-700 p-2 rounded">
+              <p>Note: Voice service is currently simulated. Text-to-speech using browser capabilities.</p>
+            </div>
+          )}
         </div>
         
         {!isSessionStarted ? (
