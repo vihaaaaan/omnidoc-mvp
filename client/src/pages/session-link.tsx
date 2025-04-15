@@ -168,8 +168,24 @@ const SessionLink = () => {
         setIsSessionComplete(true);
         setSchema(data.schema);
         
-        // Create report via API
-        createReport(data.schema);
+        // Create report via API with error handling
+        try {
+          createReport(data.schema).catch(error => {
+            console.error('Error creating report:', error);
+            toast({
+              title: 'Session Complete',
+              description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
+              variant: 'warning',
+            });
+          });
+        } catch (error) {
+          console.error('Error creating report:', error);
+          toast({
+            title: 'Session Complete',
+            description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
+            variant: 'warning',
+          });
+        }
         
         toast({
           title: 'Session Complete',
@@ -207,6 +223,17 @@ const SessionLink = () => {
   // Create report in the system
   const createReport = async (schema: Record<string, string>) => {
     try {
+      // For demo sessions that don't exist in the database,
+      // we'll just display the results without creating a database record
+      if (!sessionData) {
+        console.log('Session not found in database. Using demo mode.');
+        toast({
+          title: 'Demo Mode',
+          description: 'This is a demo session. Report data is displayed but not saved to database.',
+        });
+        return { id: 'demo-report', session_id: sessionId, summary: 'Demo report', json_schema: schema };
+      }
+      
       // First update the session status to completed
       await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
         status: 'completed'
