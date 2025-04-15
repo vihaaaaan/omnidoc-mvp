@@ -4,8 +4,9 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Loader2, Mic, MicOff, Play, Square, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getQueryFn, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { Session } from '@/types';
 
 // Voice-to-voice session page
 const SessionLink = () => {
@@ -196,28 +197,59 @@ const SessionLink = () => {
     }
   });
   
+  // Fetch session information to verify it exists
+  const { data: sessionData, isLoading: isSessionLoading } = useQuery({
+    queryKey: [`/api/sessions/${sessionId}`],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!sessionId,
+  });
+  
   // Create report in the system
   const createReport = async (schema: Record<string, string>) => {
     try {
+      // First update the session status to completed
+      await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
+        status: 'completed'
+      });
+      
       // Convert schema to a summary
       const summary = Object.entries(schema)
         .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`)
         .join('\n');
       
       // Create the report
-      await apiRequest('POST', '/api/reports', {
+      const createdReport = await apiRequest('POST', '/api/reports', {
         session_id: sessionId,
         summary,
         json_schema: schema
       });
       
-      // Update the session status
-      await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
-        status: 'completed'
+      console.log('Report created successfully:', createdReport);
+      
+      // Force a refresh of session data
+      queryClient.invalidateQueries({
+        queryKey: [`/api/sessions/${sessionId}`]
       });
       
+      // Also invalidate the patient's sessions list
+      if (sessionData?.patient_id) {
+        queryClient.invalidateQueries({
+          queryKey: [`/api/patients/${sessionData.patient_id}/sessions`]
+        });
+        queryClient.invalidateQueries({
+          queryKey: [`/api/patients/${sessionData.patient_id}/sessions-with-reports`]
+        });
+      }
+      
+      return createdReport;
     } catch (error) {
       console.error('Failed to create report:', error);
+      toast({
+        title: 'Error Creating Report',
+        description: 'There was an error saving your session data. Please contact your doctor.',
+        variant: 'destructive',
+      });
+      throw error;
     }
   };
   
@@ -389,11 +421,33 @@ const SessionLink = () => {
               Thank you for completing your health interview. Your doctor will review your information before your appointment.
             </p>
             
-            <div className="border border-gray-200 rounded-lg p-4 w-full mt-4 bg-gray-50">
-              <h3 className="font-medium mb-2">Summary:</h3>
-              <div className="space-y-1 text-sm">
+            {/* Patient details if available */}
+            {sessionData && sessionData.patient_id && (
+              <div className="w-full bg-blue-50 p-4 rounded-lg mb-2">
+                <h3 className="font-medium mb-2 text-blue-800">Session Information:</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="text-blue-700">Session ID:</span>
+                  <span className="font-mono">{sessionId}</span>
+                  <span className="text-blue-700">Status:</span>
+                  <span className="font-semibold text-green-600">Completed</span>
+                  <span className="text-blue-700">Created:</span>
+                  <span>{new Date(sessionData.started_at).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Medical report summary */}
+            <div className="border border-gray-200 rounded-lg p-4 w-full bg-gray-50">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-medium">Medical Report Summary:</h3>
+                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                  Saved
+                </span>
+              </div>
+              
+              <div className="space-y-2 text-sm divide-y divide-gray-100">
                 {Object.entries(schema).map(([key, value]) => (
-                  <div key={key} className="grid grid-cols-3 gap-2">
+                  <div key={key} className="grid grid-cols-3 gap-2 py-2">
                     <span className="font-medium text-gray-700 capitalize">{key.replace(/_/g, ' ')}:</span>
                     <span className="col-span-2">{value || 'Not provided'}</span>
                   </div>
@@ -401,9 +455,27 @@ const SessionLink = () => {
               </div>
             </div>
             
-            <Button variant="outline" asChild className="mt-4">
-              <Link href="/">Return to home</Link>
-            </Button>
+            <div className="w-full flex flex-col sm:flex-row gap-3 mt-4">
+              <Button variant="outline" asChild className="flex-1">
+                <Link href="/">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Return to Home
+                </Link>
+              </Button>
+              
+              {sessionData && sessionData.patient_id && (
+                <Button asChild className="flex-1 bg-blue-600 hover:bg-blue-700">
+                  <Link href={`/patients/${sessionData.patient_id}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    View Patient Profile
+                  </Link>
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
