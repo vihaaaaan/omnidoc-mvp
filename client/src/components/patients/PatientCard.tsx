@@ -28,37 +28,20 @@ const PatientCard = ({ patient }: PatientCardProps) => {
     navigate(url);
   };
   
-  // Create a new session for this patient
-  const handleCreateSession = async (e: React.MouseEvent) => {
+  // Handle session button click - navigate to patient detail page
+  const handleCreateSession = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent clicking through to the card
     
-    try {
-      toast({
-        title: 'Creating new session...',
-        description: `Starting session for ${patient.full_name}`,
-      });
-      
-      console.log('Creating session for patient:', patient.id);
-      const session = await createSession(patient.id);
-      
-      console.log('Session created successfully:', session);
-      toast({
-        title: 'Success!',
-        description: 'Session created successfully. Redirecting to session page.',
-      });
-      
-      // Navigate to the new session
-      setTimeout(() => {
-        navigate(`/session/${session.id}`);
-      }, 500);
-    } catch (error) {
-      console.error('Failed to create session:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create session. Please try again.',
-        variant: 'destructive',
-      });
-    }
+    console.log('Navigate to patient detail page:', patient.id);
+    
+    // Simply navigate to the patient detail page
+    navigate(`/patients/${patient.id}`);
+    
+    // Show a toast message to guide the user
+    toast({
+      title: 'Patient Details',
+      description: 'Use the "New Session" button to create a session and share the link',
+    });
   };
 
   return (
@@ -94,8 +77,8 @@ const PatientCard = ({ patient }: PatientCardProps) => {
               className="w-full text-primary-600 border-primary-200 hover:bg-primary-50 flex items-center justify-center"
               onClick={handleCreateSession}
             >
-              <Video className="h-4 w-4 mr-2" />
-              Start New Session
+              <User2 className="h-4 w-4 mr-2" />
+              View Patient
             </Button>
           </div>
           

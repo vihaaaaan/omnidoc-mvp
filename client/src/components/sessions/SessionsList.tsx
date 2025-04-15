@@ -36,7 +36,14 @@ const SessionsList = ({ sessions, isLoading }: SessionsListProps) => {
     <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-medium text-gray-900">Sessions & Reports</h2>
-        <Button className="px-4 py-2 text-sm text-primary-600 bg-primary-50 hover:bg-primary-100">
+        <Button 
+          onClick={() => {
+            // The logic to create a new session should go here
+            // This button should behave the same as the one in PatientDetail
+            console.log('Create new session from SessionsList');
+          }}
+          className="px-4 py-2 text-sm text-primary-600 bg-primary-50 hover:bg-primary-100"
+        >
           <PlusCircle className="h-4 w-4 mr-2" />
           New Session
         </Button>

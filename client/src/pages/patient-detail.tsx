@@ -5,9 +5,15 @@ import MainLayout from '@/components/layout/MainLayout';
 import SessionsList from '@/components/sessions/SessionsList';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, PlusCircle, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, Edit, PlusCircle, Loader2, Copy, Check, Mail, LinkIcon } from 'lucide-react';
 import { getPatientById, getSessionsWithReportsByPatientId, createSession } from '@/lib/supabase';
+import { sendSessionLinkEmail } from '@/lib/email-service';
 import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 import type { Patient, SessionWithReport } from '@/types';
 
 const PatientDetail = () => {
@@ -17,6 +23,10 @@ const PatientDetail = () => {
   const { toast } = useToast();
   console.log('Patient detail page rendered with id:', id, 'params:', params);
   
+  // State for session modal
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [currentSession, setCurrentSession] = useState<any>(null);
+  
   // Create new session mutation
   const createSessionMutation = useMutation({
     mutationFn: async () => {
@@ -24,13 +34,15 @@ const PatientDetail = () => {
       return await createSession(id);
     },
     onSuccess: (session) => {
+      console.log('Session created successfully:', session);
       toast({
         title: 'New Session Created',
-        description: 'Redirecting to interview page.',
+        description: 'You can now share the session link with the patient.',
       });
       
-      // Redirect to the session link page
-      setLocation(`/session/${session.id}`);
+      // Save the session and show the share dialog
+      setCurrentSession(session);
+      setShowShareDialog(true);
     },
     onError: (error) => {
       console.error('Failed to create session:', error);
@@ -106,51 +118,22 @@ const PatientDetail = () => {
               Edit Patient
             </Button>
             
-            {/* Regular HTML button for better compatibility */}
-            <button 
-              type="button"
-              className="h-9 rounded-md px-3 inline-flex items-center bg-primary-600 hover:bg-primary-700 text-white font-medium text-sm"
+            {/* New Session Button */}
+            <Button 
               onClick={() => {
-                console.log('New Session button clicked (regular HTML)');
-                if (id) {
-                  console.log('Creating session for patient:', id);
-                  
-                  // Show loading toast
-                  toast({
-                    title: 'Creating new session...',
-                    description: 'Please wait while we set up the session.',
-                  });
-                  
-                  createSession(id).then(session => {
-                    console.log('Session created:', session);
-                    
-                    // Success toast
-                    toast({
-                      title: 'Success!',
-                      description: 'New session created. Redirecting to interview page.',
-                    });
-                    
-                    // Navigate to session
-                    setTimeout(() => {
-                      setLocation(`/session/${session.id}`);
-                    }, 500);
-                    
-                  }).catch(error => {
-                    console.error('Failed to create session:', error);
-                    
-                    // Error toast
-                    toast({
-                      title: 'Error creating session',
-                      description: error.message || 'Something went wrong',
-                      variant: 'destructive',
-                    });
-                  });
-                }
+                console.log('New Session button clicked');
+                createSessionMutation.mutate();
               }}
+              className="h-9 px-3 inline-flex items-center bg-primary-600 hover:bg-primary-700 text-white font-medium text-sm"
+              disabled={createSessionMutation.isPending}
             >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Session
-            </button>
+              {createSessionMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <PlusCircle className="h-4 w-4 mr-2" />
+              )}
+              {createSessionMutation.isPending ? 'Creating...' : 'New Session'}
+            </Button>
           </div>
         )}
       </div>
@@ -215,6 +198,38 @@ const PatientDetail = () => {
           sessions={sessions || []} 
           isLoading={isLoadingSessions}
         />
+      )}
+      
+      {/* Share Session Link Dialog */}
+      {currentSession && (
+        <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Share Session Link</DialogTitle>
+              <DialogDescription>
+                Share this link with the patient to allow them to participate in the session.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <ShareSessionContent 
+              session={currentSession} 
+              patientEmail={patient?.email || ''}
+              patientName={patient?.full_name || 'Patient'}
+            />
+            
+            <DialogFooter className="sm:justify-start">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setShowShareDialog(false);
+                }}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </MainLayout>
   );
