@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('Auth state change event:', event, 'Session:', session);
         
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-          console.log('User session detected, updating state and redirecting');
+          console.log('User session detected, updating state');
           setAuthState({
             user: session.user,
             session,
@@ -87,9 +87,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             isAuthenticated: true,
           });
           
-          if (location !== '/dashboard') {
+          // Only redirect to dashboard if the user is on the login page or root
+          if (location === '/login' || location === '/') {
             console.log('Redirecting to dashboard from', location);
             navigate('/dashboard');
+          } else {
+            console.log('User is already on a valid page, not redirecting from', location);
           }
         } else if (event === 'SIGNED_OUT') {
           console.log('User signed out event detected, clearing state and redirecting');
