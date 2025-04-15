@@ -4,6 +4,7 @@ import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import PatientDetail from "@/pages/patient-detail";
 import SessionLink from "@/pages/session-link";
+import CreateSession from "@/pages/create-session";
 import NotFound from "@/pages/not-found";
 
 function App() {
@@ -29,6 +30,10 @@ function App() {
       
       <Route path="/patients/:id">
         {authState.isAuthenticated ? <PatientDetail /> : <LoginPage />}
+      </Route>
+
+      <Route path="/create-session">
+        {authState.isAuthenticated ? <CreateSession /> : <LoginPage />}
       </Route>
       
       {/* Session links - publicly accessible, no authentication needed */}

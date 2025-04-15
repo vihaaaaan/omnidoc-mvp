@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import PatientsList from '@/components/patients/PatientsList';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { PlusCircle } from 'lucide-react';
 import { getPatients } from '@/lib/supabase';
 import type { Patient } from '@/types';
 
 const Dashboard = () => {
   console.log('Dashboard component rendering');
+  const [_, setLocation] = useLocation();
   
   // Fetch patients data
   const { data: patients, isLoading, error } = useQuery({
@@ -29,9 +33,18 @@ const Dashboard = () => {
     <MainLayout>
       <div>
         {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Patient Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-600">Manage and review your patient information.</p>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Patient Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-600">Manage and review your patient information.</p>
+          </div>
+          <Button 
+            onClick={() => setLocation('/create-session')}
+            className="bg-primary-600 hover:bg-primary-700 text-white"
+          >
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Create New Session
+          </Button>
         </div>
 
         {/* Patients List with Loading State */}
