@@ -73,12 +73,19 @@ export const createSession = async (patientId: string) => {
     .insert({
       patient_id: patientId,
       started_at: now,
-      status: 'in-progress'
+      status: 'pending' // Changed from 'in-progress' to match the database constraint
     })
     .select()
     .single();
   
-  if (error) throw error;
+  console.log('Creating session with data:', { patient_id: patientId, started_at: now, status: 'pending' });
+  
+  if (error) {
+    console.error('Error creating session in Supabase:', error);
+    throw error;
+  }
+  
+  console.log('Session created successfully:', data);
   return data;
 };
 
