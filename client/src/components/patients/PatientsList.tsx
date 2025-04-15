@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PatientCard from './PatientCard';
 import EmptyState from './EmptyState';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,12 @@ interface PatientsListProps {
 }
 
 const PatientsList = ({ patients, isLoading }: PatientsListProps) => {
+  console.log('PatientsList rendering with', patients.length, 'patients, isLoading:', isLoading);
+  
+  useEffect(() => {
+    console.log('PatientsList updated with patients:', patients);
+  }, [patients]);
+  
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter patients based on search query

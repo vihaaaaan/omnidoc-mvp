@@ -1,4 +1,4 @@
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 import { formatDistanceToNow } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { User2 } from 'lucide-react';
@@ -9,14 +9,24 @@ interface PatientCardProps {
 }
 
 const PatientCard = ({ patient }: PatientCardProps) => {
+  console.log('Rendering PatientCard for patient:', patient);
+  const [, navigate] = useLocation();
+  
   // Format the created_at date to "X days ago" format
   const formattedDate = patient.created_at
     ? formatDistanceToNow(new Date(patient.created_at), { addSuffix: true })
     : 'N/A';
 
+  const handleClick = (event: React.MouseEvent) => {
+    event.preventDefault();
+    const url = `/patients/${patient.id}`;
+    console.log('Card clicked, navigating to:', url);
+    navigate(url);
+  };
+
   return (
-    <Link href={`/patients/${patient.id}`}>
-      <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300">
+    <div onClick={handleClick}>
+      <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 cursor-pointer">
         <CardContent className="p-5">
           <div className="flex justify-between items-start">
             <div>
@@ -48,7 +58,7 @@ const PatientCard = ({ patient }: PatientCardProps) => {
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </div>
   );
 };
 

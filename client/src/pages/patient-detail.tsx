@@ -10,7 +10,9 @@ import { getPatientById, getSessionsWithReportsByPatientId } from '@/lib/supabas
 import type { Patient, SessionWithReport } from '@/types';
 
 const PatientDetail = () => {
-  const { id } = useParams();
+  const params = useParams();
+  const { id } = params;
+  console.log('Patient detail page rendered with id:', id, 'params:', params);
   
   // Fetch patient data
   const { 
