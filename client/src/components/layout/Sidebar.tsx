@@ -8,6 +8,7 @@ import {
   Settings, 
   LogOut 
 } from 'lucide-react';
+import omnidocLogo from '@/assets/omnidoc.png';
 
 const Sidebar = () => {
   const [location] = useLocation();
@@ -22,10 +23,9 @@ const Sidebar = () => {
       <div className="flex flex-col justify-between h-full">
         <div className="flex-grow">
           <div className="px-4 py-6 text-center border-b">
-            <h1 className="text-xl font-bold leading-none text-primary-700">
-              <span className="flex items-center justify-center gap-2">
-                <Activity className="w-6 h-6" />
-                OmniDoc
+            <h1 className="text-xl font-bold leading-none">
+              <span className="flex items-center justify-center">
+                <img src={omnidocLogo} alt="OmniDoc Logo" className="h-9" />
               </span>
             </h1>
           </div>
