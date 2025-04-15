@@ -1,0 +1,56 @@
+You are building a modern React (Vite-based) front-end web app for a product called OmniDoc. The backend is powered by Supabase, which provides authentication and PostgreSQL database storage.
+
+Build a responsive, clean, and functional doctor dashboard interface. Use Tailwind CSS for styling.
+
+### Functional Requirements
+
+1. **Authentication**
+   - Use Supabase Auth for login and session management.
+   - Show a sign-in page with email + password.
+   - After logging in, redirect to the main dashboard.
+
+2. **Dashboard View**
+   - Display a list of all patients stored in the `patients` table.
+   - For each patient, show:
+     - Full name
+     - Email
+     - Phone number
+     - Date of birth
+   - When a patient is clicked, navigate to a detailed view for that patient.
+
+3. **Patient Detail View**
+   - Show all sessions associated with the selected patient.
+   - For each session:
+     - Show session status and timestamps.
+   - If a session is "completed", show the report summary from the `reports` table.
+   - Also render the `json_schema` field as a readable list of key-value pairs (field label → value).
+
+4. **Routing**
+   - Use React Router with the following routes:
+     - `/login` – sign-in page
+     - `/dashboard` – list of patients
+     - `/patients/:id` – detail view for one patient
+
+5. **Project Stack**
+   - React + Vite
+   - Tailwind CSS
+   - Supabase JS SDK
+   - React Router DOM
+
+### Non-Functional Requirements
+
+- Use modern, clean UI components.
+- Show loading indicators while fetching data.
+- Handle empty states (e.g., no sessions or reports).
+- Code should be well-structured into reusable components (e.g., PatientCard, SessionList, ReportDetails).
+- Use environment variables for Supabase URL and anon key.
+
+### Supabase Table Structure
+
+- `patients`: id (uuid), full_name, email, phone_number, dob, gender, address, created_at
+- `sessions`: id (uuid), patient_id (foreign key), started_at, completed_at, status
+- `reports`: id (uuid), session_id (foreign key), summary, json_schema (jsonb), created_at
+
+Make sure the app only shows reports where `status = 'completed'`.
+
+Build the frontend to query and render the correct data from Supabase using the foreign key relationships between these tables.
