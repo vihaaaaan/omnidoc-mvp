@@ -361,14 +361,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      console.log(`Direct TTS request for text: "${text.substring(0, 50)}..."`);
+      
       // Generate speech using ElevenLabs
       const audioBuffer = await textToSpeech(text, voiceId);
+      console.log(`Generated audio buffer with size: ${audioBuffer.length} bytes`);
       
       // Send the audio buffer directly (already a Buffer)
       res.setHeader('Content-Type', 'audio/mpeg');
       res.send(audioBuffer);
     } catch (error) {
       console.error('Error generating text-to-speech:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to generate speech',
+        error: String(error)
+      });
+    }
+  });
+  
+  // Direct access to TTS via query parameter - useful for session page to directly request audio
+  apiRouter.get("/tts/direct", async (req: Request, res: Response) => {
+    try {
+      const text = req.query.text as string;
+      const voiceId = req.query.voiceId as string;
+      
+      if (!text) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Text parameter is required' 
+        });
+      }
+      
+      console.log(`Direct TTS GET request for text: "${text.substring(0, 50)}..."`);
+      
+      // Generate speech using ElevenLabs
+      const audioBuffer = await textToSpeech(text, voiceId);
+      console.log(`Generated audio buffer with size: ${audioBuffer.length} bytes`);
+      
+      // Send the audio buffer directly (already a Buffer)
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error('Error generating text-to-speech via direct endpoint:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Failed to generate speech',
@@ -401,34 +436,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { audioId } = req.params;
       console.log(`Received request for audio ID: ${audioId}`);
       
-      // Get the pending audio text from memory
-      if (!req.app.locals.pendingAudio || !req.app.locals.pendingAudio.has(audioId)) {
-        console.error(`Audio ID ${audioId} not found in pendingAudio map`);
+      // Split audioId to extract the session ID and text to speak
+      const parts = audioId.split('_');
+      const sessionId = parts[0];
+      
+      // First try to get the pending audio from memory
+      let text;
+      if (req.app.locals.pendingAudio && req.app.locals.pendingAudio.has(audioId)) {
+        text = req.app.locals.pendingAudio.get(audioId);
+        console.log(`Retrieved text from memory for audio ID ${audioId}: "${text.substring(0, 50)}..."`);
         
-        // Debugging info about what IDs are available
-        if (req.app.locals.pendingAudio) {
-          console.log(`Available audio IDs: ${Array.from(req.app.locals.pendingAudio.keys()).join(', ')}`);
-        } else {
-          console.log('No pendingAudio map exists');
+        // Clean up after retrieving
+        req.app.locals.pendingAudio.delete(audioId);
+        console.log(`Removed audio ID ${audioId} from pendingAudio map`);
+      } else {
+        // If not in memory, fallback to getting session state and retrieving the current question
+        console.log(`Audio ID ${audioId} not found in memory, getting from session state...`);
+        const sessionState = getSessionState(sessionId);
+        
+        if (!sessionState || !sessionState.nextQuestion) {
+          console.error(`No session state or next question found for session ${sessionId}`);
+          return res.status(404).json({
+            success: false,
+            message: 'Session or question not found'
+          });
         }
         
-        return res.status(404).json({
-          success: false,
-          message: 'Audio not found'
-        });
+        text = sessionState.nextQuestion;
+        console.log(`Retrieved text from session state: "${text.substring(0, 50)}..."`);
       }
       
-      const text = req.app.locals.pendingAudio.get(audioId);
-      console.log(`Retrieved text for audio ID ${audioId}: "${text.substring(0, 50)}..."`);
-      
+      // Generate speech directly using ElevenLabs
       console.log('Calling ElevenLabs API to generate speech');
-      // Generate speech using ElevenLabs
       const audioBuffer = await textToSpeech(text);
       console.log(`Received audio buffer of size: ${audioBuffer.length} bytes`);
-      
-      // Clean up after serving
-      req.app.locals.pendingAudio.delete(audioId);
-      console.log(`Removed audio ID ${audioId} from pendingAudio map`);
       
       // Send the audio buffer directly (already a Buffer)
       res.setHeader('Content-Type', 'audio/mpeg');

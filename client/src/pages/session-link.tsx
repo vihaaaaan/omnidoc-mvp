@@ -348,15 +348,47 @@ const SessionLink = () => {
           setIsPlaying(false);
         };
         
-        audio.onerror = (e) => {
-          console.error('Error playing ElevenLabs audio:', e);
-          setIsPlaying(false);
+        audio.onerror = async (e) => {
+          console.error('Error playing ElevenLabs audio from URL:', e);
           
-          toast({
-            title: 'Audio Playback Error',
-            description: 'There was an error playing the audio. Please try again.',
-            variant: 'destructive',
-          });
+          // If audio URL fails, try the direct API approach as a fallback
+          try {
+            console.log('Falling back to direct TTS endpoint');
+            // Encode the text for URL usage
+            const encodedText = encodeURIComponent(text);
+            // Use the direct endpoint to get audio
+            const directUrl = `/api/tts/direct?text=${encodedText}`;
+            console.log('Using direct TTS URL:', directUrl);
+            
+            const directAudio = new Audio(directUrl);
+            
+            directAudio.onended = () => {
+              console.log('Direct TTS audio playback completed');
+              setIsPlaying(false);
+            };
+            
+            directAudio.onerror = (directError) => {
+              console.error('Error playing direct TTS audio:', directError);
+              setIsPlaying(false);
+              
+              toast({
+                title: 'Audio Playback Error',
+                description: 'All attempts to play audio failed. Please read the question.',
+                variant: 'destructive',
+              });
+            };
+            
+            await directAudio.play();
+          } catch (directError) {
+            console.error('Error with direct TTS approach:', directError);
+            setIsPlaying(false);
+            
+            toast({
+              title: 'Audio Playback Error',
+              description: 'All attempts to play audio failed. Please read the question.',
+              variant: 'destructive',
+            });
+          }
         };
         
         audio.oncanplay = () => {
@@ -367,26 +399,89 @@ const SessionLink = () => {
           console.log('ElevenLabs audio loading started');
         };
         
-        await audio.play().catch(error => {
-          console.error('Failed to play ElevenLabs audio:', error);
+        try {
+          await audio.play();
+        } catch (playError) {
+          console.error('Failed to play ElevenLabs audio:', playError);
+          
+          // If audio URL play fails, try the direct API approach
+          try {
+            console.log('Falling back to direct TTS endpoint after play failure');
+            // Encode the text for URL usage
+            const encodedText = encodeURIComponent(text);
+            // Use the direct endpoint to get audio
+            const directUrl = `/api/tts/direct?text=${encodedText}`;
+            console.log('Using direct TTS URL:', directUrl);
+            
+            const directAudio = new Audio(directUrl);
+            
+            directAudio.onended = () => {
+              console.log('Direct TTS audio playback completed');
+              setIsPlaying(false);
+            };
+            
+            directAudio.onerror = (directError) => {
+              console.error('Error playing direct TTS audio:', directError);
+              setIsPlaying(false);
+              
+              toast({
+                title: 'Audio Playback Error',
+                description: 'All attempts to play audio failed. Please read the question.',
+                variant: 'destructive',
+              });
+            };
+            
+            await directAudio.play();
+          } catch (directError) {
+            console.error('Error with direct TTS approach:', directError);
+            setIsPlaying(false);
+            
+            toast({
+              title: 'Audio Playback Error',
+              description: 'All attempts to play audio failed. Please read the question.',
+              variant: 'destructive',
+            });
+          }
+        }
+      } else {
+        // If no ElevenLabs audio URL is available, use the direct API approach
+        try {
+          console.log('No audio URL available, using direct TTS endpoint');
+          // Encode the text for URL usage
+          const encodedText = encodeURIComponent(text);
+          // Use the direct endpoint to get audio
+          const directUrl = `/api/tts/direct?text=${encodedText}`;
+          console.log('Using direct TTS URL:', directUrl);
+          
+          const directAudio = new Audio(directUrl);
+          
+          directAudio.onended = () => {
+            console.log('Direct TTS audio playback completed');
+            setIsPlaying(false);
+          };
+          
+          directAudio.onerror = (directError) => {
+            console.error('Error playing direct TTS audio:', directError);
+            setIsPlaying(false);
+            
+            toast({
+              title: 'Audio Not Available',
+              description: 'The text-to-speech audio is not available. Please read the question.',
+              variant: 'destructive',
+            });
+          };
+          
+          await directAudio.play();
+        } catch (directError) {
+          console.error('Error with direct TTS approach:', directError);
           setIsPlaying(false);
           
           toast({
-            title: 'Audio Playback Error',
-            description: 'Failed to play the audio. Please try clicking the play button again.',
+            title: 'Audio Not Available',
+            description: 'The text-to-speech audio is not available. Please read the question.',
             variant: 'destructive',
           });
-        });
-      } else {
-        // If no ElevenLabs audio URL is available, show an error
-        console.error('No ElevenLabs audio URL available');
-        setIsPlaying(false);
-        
-        toast({
-          title: 'Audio Not Available',
-          description: 'The text-to-speech audio is not available. Please read the question.',
-          variant: 'destructive',
-        });
+        }
       }
     } catch (error) {
       console.error('Error with ElevenLabs audio playback:', error);
