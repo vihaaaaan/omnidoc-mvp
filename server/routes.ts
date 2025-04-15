@@ -1,18 +1,15 @@
-import express, { type Express } from "express";
+import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertPatientSchema, insertSessionSchema, insertReportSchema } from "@shared/schema";
 import { z } from "zod";
 import { handleSendEmail } from "./send-email";
-import { setupVoiceProxyRoutes } from "./voice-proxy";
+import { generateFirstQuestion, processResponse, generateReport, getSessionState } from "./llm-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes prefix
   const apiRouter = express.Router();
   app.use("/api", apiRouter);
-  
-  // Setup voice service proxy routes
-  setupVoiceProxyRoutes(app);
 
   // Patient routes
   apiRouter.get("/patients", async (req, res) => {
