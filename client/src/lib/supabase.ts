@@ -53,6 +53,21 @@ export const getSessionsByPatientId = async (patientId: string) => {
   return data;
 };
 
+export const updateSessionStatus = async (sessionId: string, status: string) => {
+  const { data, error } = await supabase
+    .from('sessions')
+    .update({ 
+      status,
+      ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {})
+    })
+    .eq('id', sessionId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
 // Reports helpers
 export const getReportBySessionId = async (sessionId: string) => {
   const { data, error } = await supabase
@@ -62,6 +77,22 @@ export const getReportBySessionId = async (sessionId: string) => {
     .single();
   
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned" which is valid
+  return data;
+};
+
+export const createReport = async (sessionId: string, summary: string, jsonSchema: any) => {
+  const { data, error } = await supabase
+    .from('reports')
+    .insert({
+      session_id: sessionId,
+      summary,
+      json_schema: jsonSchema,
+      created_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
   return data;
 };
 

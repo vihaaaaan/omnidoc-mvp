@@ -5,6 +5,7 @@ import { Loader2, Mic, MicOff, Play, Square, Send, RefreshCw } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { apiRequest, getQueryFn, queryClient } from '@/lib/queryClient';
+import { updateSessionStatus, createReport as createSupabaseReport } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { Session } from '@/types';
 
@@ -202,24 +203,37 @@ const SessionLink = () => {
         return { id: 'demo-report', session_id: sessionId, summary: 'Demo report', json_schema: schema };
       }
       
-      // First update the session status to completed
-      await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
-        status: 'completed'
-      });
+      // Update session status in Supabase
+      try {
+        const updatedSession = await updateSessionStatus(sessionId, 'completed');
+        console.log('Session status updated to completed:', updatedSession);
+      } catch (error) {
+        console.error('Error updating session status in Supabase:', error);
+        // Fallback to API if Supabase update fails
+        await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, {
+          status: 'completed'
+        });
+      }
       
       // Convert schema to a summary
       const summary = Object.entries(schema)
         .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`)
         .join('\n');
       
-      // Create the report
-      const createdReport = await apiRequest('POST', '/api/reports', {
-        session_id: sessionId,
-        summary,
-        json_schema: schema
-      });
-      
-      console.log('Report created successfully:', createdReport);
+      // Create report in Supabase
+      let createdReport;
+      try {
+        createdReport = await createSupabaseReport(sessionId, summary, schema);
+        console.log('Report created in Supabase successfully:', createdReport);
+      } catch (supabaseError) {
+        console.error('Error creating report in Supabase:', supabaseError);
+        // Fallback to API if Supabase creation fails
+        createdReport = await apiRequest('POST', '/api/reports', {
+          session_id: sessionId,
+          summary,
+          json_schema: schema
+        }).then(r => r.json());
+      }
       
       // Force a refresh of session data
       queryClient.invalidateQueries({
