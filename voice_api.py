@@ -224,90 +224,140 @@ def summarize_response_for_schema(field, raw_response):
 @app.route('/api/start-session/<session_id>', methods=['POST'])
 def start_session(session_id):
     """Initialize or reset a session"""
-    schema = reset_schema(session_id)
-    field = get_next_unfilled_field(schema)
-    
-    if not field:
-        return jsonify({"message": "All fields already completed", "complete": True})
-    
-    question = generate_first_question(field)
-    
-    return jsonify({
-        "session_id": session_id,
-        "current_field": field,
-        "question": question,
-        "complete": False
-    })
+    print(f"Starting session {session_id}")
+    try:
+        schema = reset_schema(session_id)
+        field = get_next_unfilled_field(schema)
+        
+        if not field:
+            print(f"All fields already completed for session {session_id}")
+            return jsonify({"message": "All fields already completed", "complete": True})
+        
+        print(f"Generating first question for field: {field}")
+        question = generate_first_question(field)
+        print(f"Generated question: {question}")
+        
+        response = {
+            "session_id": session_id,
+            "current_field": field,
+            "question": question,
+            "complete": False
+        }
+        print(f"Returning response: {response}")
+        return jsonify(response)
+    except Exception as e:
+        print(f"Error in start_session: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/process-response/<session_id>', methods=['POST'])
 def process_response(session_id):
     """Process a patient response"""
-    data = request.json
-    response_text = data.get('response')
-    
-    schema = load_schema(session_id)
-    current_field = data.get('current_field')
-    
-    if not current_field:
-        current_field = get_next_unfilled_field(schema)
-    
-    # Process the current response
-    complete = needs_follow_up(current_field, response_text)
-    
-    if complete:
-        # Save the response and move to next field
-        clean_value = summarize_response_for_schema(current_field, response_text)
-        schema[current_field] = clean_value
-        save_schema(session_id, schema)
+    print(f"Processing response for session {session_id}")
+    try:
+        data = request.json
+        response_text = data.get('response')
+        print(f"Received response: {response_text[:50]}...")
         
-        # Get the next field
-        next_field = get_next_unfilled_field(schema)
+        schema = load_schema(session_id)
+        print(f"Loaded schema with fields: {list(schema.keys())}")
         
-        if not next_field:
-            # All fields completed
-            return jsonify({
-                "message": "All fields completed",
-                "complete": True,
-                "schema": schema
-            })
+        current_field = data.get('current_field')
+        print(f"Current field from request: {current_field}")
         
-        # Generate next question
-        question = generate_transition_question(response_text, next_field)
+        if not current_field:
+            current_field = get_next_unfilled_field(schema)
+            print(f"No field specified, using next unfilled field: {current_field}")
         
-        return jsonify({
-            "current_field": next_field,
-            "question": question,
-            "complete": False
-        })
-    else:
-        # Need follow-up for current field
-        follow_up = generate_follow_up_question(current_field, response_text)
+        # Process the current response
+        print(f"Checking if response is complete for field: {current_field}")
+        complete = needs_follow_up(current_field, response_text)
+        print(f"Response completeness check result: {complete}")
         
-        return jsonify({
-            "current_field": current_field,
-            "question": follow_up,
-            "complete": False
-        })
+        if complete:
+            # Save the response and move to next field
+            print(f"Response is complete, summarizing for field: {current_field}")
+            clean_value = summarize_response_for_schema(current_field, response_text)
+            print(f"Summarized value: {clean_value}")
+            
+            schema[current_field] = clean_value
+            save_schema(session_id, schema)
+            print(f"Updated schema saved for session {session_id}")
+            
+            # Get the next field
+            next_field = get_next_unfilled_field(schema)
+            print(f"Next field to fill: {next_field}")
+            
+            if not next_field:
+                # All fields completed
+                print(f"All fields completed for session {session_id}")
+                response = {
+                    "message": "All fields completed",
+                    "complete": True,
+                    "schema": schema
+                }
+                print(f"Returning completion response: {response}")
+                return jsonify(response)
+            
+            # Generate next question
+            print(f"Generating transition question to field: {next_field}")
+            question = generate_transition_question(response_text, next_field)
+            print(f"Generated question: {question}")
+            
+            response = {
+                "current_field": next_field,
+                "question": question,
+                "complete": False
+            }
+            print(f"Returning next question response: {response}")
+            return jsonify(response)
+        else:
+            # Need follow-up for current field
+            print(f"Response is incomplete, generating follow-up for field: {current_field}")
+            follow_up = generate_follow_up_question(current_field, response_text)
+            print(f"Generated follow-up question: {follow_up}")
+            
+            response = {
+                "current_field": current_field,
+                "question": follow_up,
+                "complete": False
+            }
+            print(f"Returning follow-up response: {response}")
+            return jsonify(response)
+    except Exception as e:
+        error_msg = f"Error in process_response: {str(e)}"
+        print(error_msg)
+        return jsonify({"error": error_msg}), 500
 
 @app.route('/api/text-to-speech', methods=['POST'])
 def text_to_speech_endpoint():
     """Convert text to speech"""
+    print("Processing text-to-speech request")
     data = request.json
     text = data.get('text')
     
+    print(f"Received text: {text}")
     if not text:
+        print("Error: No text provided")
         return jsonify({"error": "No text provided"}), 400
     
     try:
         # Convert text to speech
+        print(f"Initializing pyttsx3 engine")
         engine = pyttsx3.init()
+        print(f"Saving text to temp_audio.wav: {text[:50]}...")
         engine.save_to_file(text, 'temp_audio.wav')
+        print(f"Running engine...")
         engine.runAndWait()
+        print(f"Audio file created at temp_audio.wav")
         
         # Return the audio file path (in a real app, you'd stream the audio)
-        return jsonify({"status": "success", "message": "Audio generated", "file_path": "temp_audio.wav"})
+        response = {"status": "success", "message": "Audio generated", "file_path": "temp_audio.wav"}
+        print(f"Returning response: {response}")
+        return jsonify(response)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        error_msg = f"Error in text-to-speech: {str(e)}"
+        print(error_msg)
+        return jsonify({"error": error_msg}), 500
 
 @app.route('/api/speech-to-text', methods=['POST'])
 def speech_to_text_endpoint():

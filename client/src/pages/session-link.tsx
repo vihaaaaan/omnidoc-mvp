@@ -191,7 +191,7 @@ const SessionLink = () => {
             toast({
               title: 'Session Complete',
               description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
-              variant: 'warning',
+              variant: 'destructive',
             });
           });
         } catch (error) {
@@ -199,7 +199,7 @@ const SessionLink = () => {
           toast({
             title: 'Session Complete',
             description: 'Your session was completed, but there was an issue saving the data. Your answers are still visible.',
-            variant: 'warning',
+            variant: 'destructive',
           });
         }
         
