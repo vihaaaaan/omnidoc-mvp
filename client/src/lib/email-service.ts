@@ -1,7 +1,7 @@
-import { supabase } from './supabase';
+import { apiRequest } from './queryClient';
 
 /**
- * Send session link via email using the Supabase REST API
+ * Send session link via email using our backend API endpoint
  * 
  * @param email The recipient's email address
  * @param sessionId The session ID
@@ -48,33 +48,34 @@ export const sendSessionLinkEmail = async (
       </div>
     `;
     
-    // Create a simple test email function (for demo purposes)
-    // In a production environment, you would connect to your email service API
+    // Create plain text version for email clients that don't support HTML
+    const emailText = `
+      Hello ${patientName},
+      
+      ${doctorName} has invited you to a medical session.
+      
+      Please copy and paste this link in your browser to join the session:
+      ${sessionLink}
+      
+      This link is unique to your session and should not be shared with others.
+      
+      Best regards,
+      The OmniDoc Team
+    `;
     
-    // This is a mock implementation - it will just show a success message
-    // but won't actually send an email without setting up a proper email service
-    
-    // Simulate a network request 
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Log email details to console for debugging
-    console.log('Email would be sent with:', {
+    // Send the email using our API endpoint
+    const response = await apiRequest("POST", "/api/send-email", {
       to: email,
       subject: emailSubject,
-      sessionLink,
-      patientName,
-      doctorName
+      html: emailHtml,
+      text: emailText
     });
-
-    // In a real app, you would:
-    // 1. Create an actual server-side API endpoint that connects to an email service
-    // 2. Call that endpoint from here, passing the email details
-    // 3. Handle any errors from the email service
     
-    // For now, we'll just simulate a successful email send
+    const result = await response.json();
+    
     return { 
-      success: true, 
-      message: `Email would be sent to ${email}. In a production environment, this would actually send an email with the session link.` 
+      success: result.success, 
+      message: result.message || `Email has been sent to ${email}`
     };
   } catch (error) {
     console.error('Unexpected error with email service:', error);

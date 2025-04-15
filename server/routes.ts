@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertPatientSchema, insertSessionSchema, insertReportSchema } from "@shared/schema";
 import { z } from "zod";
+import { handleSendEmail } from "./send-email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes prefix
@@ -177,6 +178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch sessions with reports" });
     }
   });
+  
+  // Email endpoint
+  apiRouter.post("/send-email", handleSendEmail);
 
   // Create HTTP server
   const httpServer = createServer(app);
