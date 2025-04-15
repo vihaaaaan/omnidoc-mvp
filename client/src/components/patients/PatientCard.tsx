@@ -1,7 +1,10 @@
 import { useLocation } from 'wouter';
 import { formatDistanceToNow } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
-import { User2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { User2, Video, PlusCircle } from 'lucide-react';
+import { createSession } from '@/lib/supabase'; 
+import { useToast } from '@/hooks/use-toast';
 import type { Patient } from '@/types';
 
 interface PatientCardProps {
@@ -11,6 +14,7 @@ interface PatientCardProps {
 const PatientCard = ({ patient }: PatientCardProps) => {
   console.log('Rendering PatientCard for patient:', patient);
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   
   // Format the created_at date to "X days ago" format
   const formattedDate = patient.created_at
@@ -22,6 +26,39 @@ const PatientCard = ({ patient }: PatientCardProps) => {
     const url = `/patients/${patient.id}`;
     console.log('Card clicked, navigating to:', url);
     navigate(url);
+  };
+  
+  // Create a new session for this patient
+  const handleCreateSession = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent clicking through to the card
+    
+    try {
+      toast({
+        title: 'Creating new session...',
+        description: `Starting session for ${patient.full_name}`,
+      });
+      
+      console.log('Creating session for patient:', patient.id);
+      const session = await createSession(patient.id);
+      
+      console.log('Session created successfully:', session);
+      toast({
+        title: 'Success!',
+        description: 'Session created successfully. Redirecting to session page.',
+      });
+      
+      // Navigate to the new session
+      setTimeout(() => {
+        navigate(`/session/${session.id}`);
+      }, 500);
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create session. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -49,7 +86,20 @@ const PatientCard = ({ patient }: PatientCardProps) => {
               </div>
             </div>
           </div>
-          <div className="mt-4 flex justify-between">
+          {/* Session Button */}
+          <div className="mt-4 w-full">
+            <Button 
+              variant="outline"
+              size="sm"
+              className="w-full text-primary-600 border-primary-200 hover:bg-primary-50 flex items-center justify-center"
+              onClick={handleCreateSession}
+            >
+              <Video className="h-4 w-4 mr-2" />
+              Start New Session
+            </Button>
+          </div>
+          
+          <div className="mt-3 flex justify-between">
             <span className="text-xs text-gray-500">
               <span className="inline-block mr-1">•</span>
               Added {formattedDate}
