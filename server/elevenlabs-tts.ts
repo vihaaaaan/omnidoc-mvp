@@ -1,13 +1,6 @@
-import elevenlabs from 'elevenlabs';
+import { ElevenLabsClient } from 'elevenlabs';
 
-// Define interfaces for ElevenLabs API
-interface VoiceSettings {
-  stability: number;
-  similarity_boost: number;
-  style?: number;
-  use_speaker_boost?: boolean;
-}
-
+// Define interface for ElevenLabs voice
 interface Voice {
   voice_id: string;
   name: string;
@@ -23,20 +16,23 @@ interface Voice {
 const VOICE_ID = 'pNInz6obpgDQGcFmaJgB'; // Adam voice by default
 const MODEL_ID = 'eleven_multilingual_v2'; // Multilingual model for better pronunciation of medical terms
 
-// Set the API key for ElevenLabs
-let initialized = false;
+// Singleton ElevenLabs client
+let client: ElevenLabsClient | null = null;
 
-// Initialize ElevenLabs client
-function initializeClient(): void {
-  if (!initialized) {
+// Get or create ElevenLabs client
+function getClient(): ElevenLabsClient {
+  if (!client) {
     if (!process.env.ELEVENLABS_API_KEY) {
       throw new Error('ELEVENLABS_API_KEY environment variable is required');
     }
     
-    elevenlabs.setApiKey(process.env.ELEVENLABS_API_KEY);
-    initialized = true;
+    client = new ElevenLabsClient({
+      apiKey: process.env.ELEVENLABS_API_KEY
+    });
+    
     console.log('ElevenLabs Text-to-Speech API client initialized');
   }
+  return client;
 }
 
 /**
@@ -50,8 +46,7 @@ export async function textToSpeech(
   voiceId: string = VOICE_ID
 ): Promise<ArrayBuffer> {
   try {
-    // Ensure client is initialized
-    initializeClient();
+    const elevenlabs = getClient();
     
     console.log(`Converting to speech: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
     
@@ -59,7 +54,7 @@ export async function textToSpeech(
     const audioBuffer = await elevenlabs.generate({
       voice: voiceId,
       text: text,
-      model: MODEL_ID,
+      model_id: MODEL_ID,
       voice_settings: {
         stability: 0.5,
         similarity_boost: 0.75,
@@ -82,10 +77,9 @@ export async function textToSpeech(
  */
 export async function getAvailableVoices(): Promise<Voice[]> {
   try {
-    // Ensure client is initialized
-    initializeClient();
-    
+    const elevenlabs = getClient();
     const voices = await elevenlabs.voices.getAll();
+    
     return voices.map(voice => ({
       voice_id: voice.voice_id,
       name: voice.name,

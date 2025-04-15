@@ -188,14 +188,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   apiRouter.get("/conversation/start/:sessionId", async (req: Request, res: Response) => {
     try {
       const { sessionId } = req.params;
+      const useElevenLabs = req.query.useElevenLabs === 'true';
       
       // Start a new conversation and get the first question
       const firstQuestion = await generateFirstQuestion(sessionId);
       
+      // Generate audio if ElevenLabs is requested
+      let audioUrl = null;
+      if (useElevenLabs) {
+        try {
+          // Generate a unique identifier for this audio file
+          const audioId = `${sessionId}_${Date.now()}`;
+          
+          // Generate speech with ElevenLabs and store the URL for frontend use
+          audioUrl = `/api/tts/audio/${audioId}`;
+          
+          // Store the question text in memory to be retrieved when the audio URL is requested
+          // This approach prevents sending the audio in the initial response
+          // and instead provides a URL that the client can request
+          if (!req.app.locals.pendingAudio) {
+            req.app.locals.pendingAudio = new Map();
+          }
+          req.app.locals.pendingAudio.set(audioId, firstQuestion);
+        } catch (audioError) {
+          console.error('Error generating speech:', audioError);
+          // Continue without audio if there's an error
+        }
+      }
+      
       res.json({ 
         success: true, 
         question: firstQuestion,
-        sessionId
+        sessionId,
+        audioUrl
       });
     } catch (error) {
       console.error('Error starting conversation:', error);
@@ -210,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   apiRouter.post("/conversation/respond/:sessionId", async (req: Request, res: Response) => {
     try {
       const { sessionId } = req.params;
-      const { response } = req.body;
+      const { response, useElevenLabs } = req.body;
       
       if (!response || typeof response !== 'string') {
         return res.status(400).json({ 
@@ -222,11 +247,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process the response and get the next question
       const result = await processResponse(sessionId, response);
       
+      // Generate audio if ElevenLabs is requested and there's a question
+      let audioUrl = null;
+      if (useElevenLabs && result.question) {
+        try {
+          // Generate a unique identifier for this audio file
+          const audioId = `${sessionId}_${Date.now()}`;
+          
+          // Generate speech with ElevenLabs and store the URL for frontend use
+          audioUrl = `/api/tts/audio/${audioId}`;
+          
+          // Store the question text in memory to be retrieved when the audio URL is requested
+          if (!req.app.locals.pendingAudio) {
+            req.app.locals.pendingAudio = new Map();
+          }
+          req.app.locals.pendingAudio.set(audioId, result.question);
+        } catch (audioError) {
+          console.error('Error generating speech:', audioError);
+          // Continue without audio if there's an error
+        }
+      }
+      
       res.json({
         success: true,
         question: result.question,
         isComplete: result.isComplete,
-        sessionId
+        sessionId,
+        audioUrl
       });
       
       // If the conversation is complete, generate a report
@@ -330,6 +377,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         message: 'Failed to get voices',
+        error: String(error)
+      });
+    }
+  });
+  
+  // Route to serve generated audio files
+  apiRouter.get("/tts/audio/:audioId", async (req: Request, res: Response) => {
+    try {
+      const { audioId } = req.params;
+      
+      // Get the pending audio text from memory
+      if (!req.app.locals.pendingAudio || !req.app.locals.pendingAudio.has(audioId)) {
+        return res.status(404).json({
+          success: false,
+          message: 'Audio not found'
+        });
+      }
+      
+      const text = req.app.locals.pendingAudio.get(audioId);
+      
+      // Generate speech using ElevenLabs
+      const audioBuffer = await textToSpeech(text);
+      
+      // Clean up after serving
+      req.app.locals.pendingAudio.delete(audioId);
+      
+      // Send the audio as a buffer
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.send(Buffer.from(audioBuffer));
+    } catch (error) {
+      console.error('Error serving audio file:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to serve audio file',
         error: String(error)
       });
     }
