@@ -41,6 +41,16 @@ export async function sendEmail(
   html: string, 
   text?: string
 ): Promise<{ success: boolean; message: string }> {
+  console.log('== SMTP Email Service ==');
+  console.log('Attempting to send email to:', to);
+  console.log('SMTP Config:', {
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    user: SMTP_USER ? '(configured)' : '(not configured)',
+    from: SMTP_FROM
+  });
+
   if (!SMTP_USER || !SMTP_PASS) {
     console.warn('SMTP credentials not configured');
     return {
@@ -50,17 +60,33 @@ export async function sendEmail(
   }
 
   try {
-    await transporter.sendMail({
+    const mailOptions = {
       from: `"OmniDoc" <${SMTP_FROM}>`,
       to,
       subject,
       text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML if text not provided
       html,
+    };
+    
+    console.log('Mail options:', {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject
     });
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully! MessageID:', info.messageId);
+    // Check if the message was accepted
+    if (info.accepted && info.accepted.length > 0) {
+      console.log('Email was accepted for:', info.accepted);
+    }
+    if (info.rejected && info.rejected.length > 0) {
+      console.warn('Email was rejected for:', info.rejected);
+    }
 
     return {
       success: true,
-      message: 'Email sent successfully'
+      message: `Email sent successfully to ${to}. MessageID: ${info.messageId}`
     };
   } catch (error) {
     console.error('Error sending email:', error);
@@ -139,14 +165,23 @@ This is an automated message, please do not reply to this email.
  * Express route handler for sending session link emails
  */
 export async function handleSendSessionLinkEmail(req: Request, res: Response) {
+  console.log('Received email sending request:', req.body);
   const { to, sessionId, patientName, doctorName } = req.body;
 
   if (!to || !sessionId || !patientName) {
+    console.warn('Missing required fields for sending email:', { to, sessionId, patientName });
     return res.status(400).json({ 
       success: false, 
       message: 'Missing required fields: to, sessionId, patientName' 
     });
   }
+
+  console.log('Sending session link email with data:', { 
+    to, 
+    sessionId,
+    patientName,
+    doctorName: doctorName || 'your healthcare provider'
+  });
 
   const result = await sendSessionLinkEmail(
     to, 
@@ -154,6 +189,8 @@ export async function handleSendSessionLinkEmail(req: Request, res: Response) {
     patientName, 
     doctorName
   );
+
+  console.log('Email sending result:', result);
 
   if (result.success) {
     res.status(200).json(result);

@@ -16,6 +16,8 @@ export const sendSessionLinkEmail = async (
   doctorName?: string
 ): Promise<{ success: boolean; message: string }> => {
   try {
+    console.log('Sending session link email to:', email, 'for session:', sessionId);
+    
     const response = await apiRequest('POST', '/api/send-session-email', {
       to: email,
       sessionId,
@@ -24,6 +26,7 @@ export const sendSessionLinkEmail = async (
     });
     
     const data = await response.json();
+    console.log('Email API response:', data);
     return data;
   } catch (error) {
     console.error('Error sending session link email:', error);
