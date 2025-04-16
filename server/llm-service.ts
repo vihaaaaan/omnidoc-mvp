@@ -114,24 +114,6 @@ export async function generateFirstQuestion(
     let question =
       response.choices[0].message.content ||
       "Hello, I'm a medical assistant from OmniDoc. I'm here to help with your medical screening. What brings you in today?";
-      
-    // First, replace all placeholders and name patterns with OmniDoc
-    question = question.replace(/\[Your Name\]/g, "OmniDoc");
-    question = question.replace(/my name is \[.*?\]/gi, "I'm from OmniDoc");
-    question = question.replace(/I am \[.*?\]/gi, "I'm from OmniDoc");
-    question = question.replace(/I'm \[.*?\]/gi, "I'm from OmniDoc");
-    // Additional patterns we might see
-    question = question.replace(/called \[.*?\]/gi, "from OmniDoc");
-    question = question.replace(/My name is [a-zA-Z]+/gi, "I'm from OmniDoc");
-    question = question.replace(/I am [a-zA-Z]+/gi, "I'm from OmniDoc");
-    question = question.replace(/I'm [a-zA-Z]+/gi, "I'm from OmniDoc");
-    
-    // Now fix common duplication issues with the introduction
-    question = question.replace(/I'm from OmniDoc\s*\.\s*I'm from OmniDoc/gi, "I'm from OmniDoc");
-    question = question.replace(/from OmniDoc\s*\.\s*from OmniDoc/gi, "from OmniDoc");
-    question = question.replace(/I'm from OmniDoc\s*\.\s*I'm a medical assistant from OmniDoc/gi, "I'm a medical assistant from OmniDoc");
-    question = question.replace(/I'm a medical assistant from OmniDoc\s*\.\s*I'm from OmniDoc/gi, "I'm a medical assistant from OmniDoc");
-    question = question.replace(/OmniDoc,\s*from OmniDoc/gi, "OmniDoc");
 
     session.nextQuestion = question;
     return question;
@@ -236,23 +218,41 @@ export async function processResponse(
     let nextQuestion =
       nextQuestionResponse.choices[0].message.content ||
       `Could you tell me about your ${nextField.replace("_", " ")}?`;
-      
+
     // First, replace all placeholders and name patterns with OmniDoc
     nextQuestion = nextQuestion.replace(/\[Your Name\]/g, "OmniDoc");
-    nextQuestion = nextQuestion.replace(/my name is \[.*?\]/gi, "I'm from OmniDoc");
+    nextQuestion = nextQuestion.replace(
+      /my name is \[.*?\]/gi,
+      "I'm from OmniDoc",
+    );
     nextQuestion = nextQuestion.replace(/I am \[.*?\]/gi, "I'm from OmniDoc");
     nextQuestion = nextQuestion.replace(/I'm \[.*?\]/gi, "I'm from OmniDoc");
     // Additional patterns we might see
     nextQuestion = nextQuestion.replace(/called \[.*?\]/gi, "from OmniDoc");
-    nextQuestion = nextQuestion.replace(/My name is [a-zA-Z]+/gi, "I'm from OmniDoc");
+    nextQuestion = nextQuestion.replace(
+      /My name is [a-zA-Z]+/gi,
+      "I'm from OmniDoc",
+    );
     nextQuestion = nextQuestion.replace(/I am [a-zA-Z]+/gi, "I'm from OmniDoc");
     nextQuestion = nextQuestion.replace(/I'm [a-zA-Z]+/gi, "I'm from OmniDoc");
-    
+
     // Now fix common duplication issues with the introduction
-    nextQuestion = nextQuestion.replace(/I'm from OmniDoc\s*\.\s*I'm from OmniDoc/gi, "I'm from OmniDoc");
-    nextQuestion = nextQuestion.replace(/from OmniDoc\s*\.\s*from OmniDoc/gi, "from OmniDoc");
-    nextQuestion = nextQuestion.replace(/I'm from OmniDoc\s*\.\s*I'm a medical assistant from OmniDoc/gi, "I'm a medical assistant from OmniDoc");
-    nextQuestion = nextQuestion.replace(/I'm a medical assistant from OmniDoc\s*\.\s*I'm from OmniDoc/gi, "I'm a medical assistant from OmniDoc");
+    nextQuestion = nextQuestion.replace(
+      /I'm from OmniDoc\s*\.\s*I'm from OmniDoc/gi,
+      "I'm from OmniDoc",
+    );
+    nextQuestion = nextQuestion.replace(
+      /from OmniDoc\s*\.\s*from OmniDoc/gi,
+      "from OmniDoc",
+    );
+    nextQuestion = nextQuestion.replace(
+      /I'm from OmniDoc\s*\.\s*I'm a medical assistant from OmniDoc/gi,
+      "I'm a medical assistant from OmniDoc",
+    );
+    nextQuestion = nextQuestion.replace(
+      /I'm a medical assistant from OmniDoc\s*\.\s*I'm from OmniDoc/gi,
+      "I'm a medical assistant from OmniDoc",
+    );
     nextQuestion = nextQuestion.replace(/OmniDoc,\s*from OmniDoc/gi, "OmniDoc");
 
     session.nextQuestion = nextQuestion;

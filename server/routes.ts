@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertPatientSchema, insertSessionSchema, insertReportSchema } from "@shared/schema";
 import { z } from "zod";
 import { handleSendEmail } from "./send-email";
+import { handleSendSessionLinkEmail } from "./smtp-email-service";
 import { generateFirstQuestion, processResponse, generateReport, getSessionState } from "./llm-service";
 import { textToSpeech, getAvailableVoices } from "./elevenlabs-tts";
 
@@ -181,8 +182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Email endpoint
+  // Email endpoints
   apiRouter.post("/send-email", handleSendEmail);
+  apiRouter.post("/send-session-email", handleSendSessionLinkEmail);
   
   // Voice conversation API endpoints
   apiRouter.get("/conversation/start/:sessionId", async (req: Request, res: Response) => {
