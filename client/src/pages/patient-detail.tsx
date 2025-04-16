@@ -35,7 +35,7 @@ const ShareSessionContent = ({ session, patientEmail, patientName }: ShareSessio
     return btoa(session.id).substring(0, 12);
   };
   
-  const sessionLink = `${window.location.origin}/session/${session.id}/${generateUniqueToken()}`;
+  const sessionLink = `${window.location.origin}/session/${session.id}`;
   
   // Copy to clipboard function
   const copyToClipboard = () => {
@@ -114,11 +114,9 @@ const ShareSessionContent = ({ session, patientEmail, patientName }: ShareSessio
               setIsSendingEmail(true);
               
               try {
-                const token = generateUniqueToken();
                 const result = await sendSessionLinkEmail(
                   emailTo,
                   session.id,
-                  token,
                   patientName,
                   'Dr. Smith' // Ideally this would be the actual doctor name
                 );
