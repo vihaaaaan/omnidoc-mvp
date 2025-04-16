@@ -25,7 +25,6 @@ interface ShareSessionContentProps {
 
 const ShareSessionContent = ({ session, patientEmail, patientName }: ShareSessionContentProps) => {
   const [copied, setCopied] = useState(false);
-  const [emailTo, setEmailTo] = useState(patientEmail || '');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [activeTab, setActiveTab] = useState('link');
   
@@ -95,27 +94,26 @@ const ShareSessionContent = ({ session, patientEmail, patientName }: ShareSessio
       <TabsContent value="email">
         <div className="space-y-4 mt-2">
           <div className="space-y-2">
-            <Label htmlFor="email">Patient Email</Label>
-            <Input
-              id="email" 
-              type="email" 
-              placeholder="patient@example.com" 
-              value={emailTo}
-              onChange={(e) => setEmailTo(e.target.value)}
-            />
+            <div className="flex flex-row items-center justify-between">
+              <Label htmlFor="email">Patient Email</Label>
+              <span className="text-sm text-muted-foreground">(Pre-filled from patient record)</span>
+            </div>
+            <div className="border rounded-md p-3 bg-gray-50 text-sm font-medium">
+              {patientEmail}
+            </div>
           </div>
           <Button 
             type="button" 
             className="w-full"
-            disabled={!emailTo || isSendingEmail}
+            disabled={!patientEmail || isSendingEmail}
             onClick={async () => {
-              if (!emailTo) return;
+              if (!patientEmail) return;
               
               setIsSendingEmail(true);
               
               try {
                 const result = await sendSessionLinkEmail(
-                  emailTo,
+                  patientEmail,
                   session.id,
                   patientName,
                   'Dr. Smith' // Ideally this would be the actual doctor name
@@ -124,12 +122,8 @@ const ShareSessionContent = ({ session, patientEmail, patientName }: ShareSessio
                 if (result.success) {
                   toast({
                     title: "Email sent successfully",
-                    description: `The session link has been sent to ${emailTo}`,
+                    description: `The session link has been sent to ${patientEmail}`,
                   });
-                  // Don't clear the email field if it's the patient's email
-                  if (emailTo !== patientEmail) {
-                    setEmailTo('');
-                  }
                 } else {
                   toast({
                     variant: "destructive",

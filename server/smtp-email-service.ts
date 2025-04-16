@@ -88,8 +88,8 @@ export async function sendSessionLinkEmail(
   doctorName: string = 'your healthcare provider'
 ): Promise<{ success: boolean; message: string }> {
   const subject = 'Your OmniDoc Medical Screening Session';
-  // Use the current host as the base URL if PUBLIC_URL is not set
-  const PUBLIC_URL = process.env.PUBLIC_URL || 'https://omnidoc.replit.app';
+  // Use the current Replit dev URL
+  const PUBLIC_URL = 'https://a55cfd16-c58f-4fcb-bf5b-53bff43c3876-00-ohsxy2mkhvjl.spock.replit.dev';
   const sessionUrl = `${PUBLIC_URL}/session/${sessionId}`;
 
   const html = `
