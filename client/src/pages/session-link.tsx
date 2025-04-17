@@ -68,12 +68,6 @@ const SessionLink = () => {
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState("");
-  // State for the typing effect - what's actually displayed to the user
-  const [displayedQuestion, setDisplayedQuestion] = useState("");
-  // For typing effect - track if we're currently animating text
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingSpeed, setTypingSpeed] = useState(25); // ms per character (lower = faster)
-  
   const [patientResponse, setPatientResponse] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -109,78 +103,6 @@ const SessionLink = () => {
       console.log("Speech Recognition is available");
     }
   }, []);
-  
-  // Typing effect for OmniDoc's dialogue
-  useEffect(() => {
-    // If there's no question or we're not in an active session, don't do anything
-    if (!currentQuestion || !isSessionStarted) {
-      setDisplayedQuestion("");
-      return;
-    }
-    
-    // Reset the displayed text and start typing
-    setDisplayedQuestion("");
-    setIsTyping(true);
-    
-    let currentIndex = 0;
-    const totalChars = currentQuestion.length;
-    let timers: NodeJS.Timeout[] = [];
-    
-    // Calculate a slightly variable typing speed
-    // This makes the typing look more natural
-    const getTypingInterval = () => {
-      // Base typing speed with slight randomness
-      const randomVariation = Math.random() * 15 - 5; // -5 to +10ms variation
-      return Math.max(10, typingSpeed + randomVariation);
-    };
-    
-    // Add slight pauses after punctuation for more natural typing
-    const getPunctuationPause = (char: string) => {
-      if (char === '.') return 300; // longer pause after sentences
-      if (char === ',' || char === ':' || char === ';') return 150; // medium pause after commas
-      if (char === '?' || char === '!') return 250; // pause after questions or exclamations
-      return 0; // no extra pause for other characters
-    };
-    
-    // Function to add the next character
-    const addNextChar = () => {
-      if (currentIndex < totalChars) {
-        const currentChar = currentQuestion.charAt(currentIndex);
-        setDisplayedQuestion(prev => prev + currentChar);
-        currentIndex++;
-        
-        // Add extra delay after punctuation for more natural timing
-        const extraDelay = getPunctuationPause(currentChar);
-        
-        // Log progress (debugging)
-        if (currentIndex % 20 === 0 || currentIndex === totalChars) {
-          console.log(`Typing effect: ${currentIndex}/${totalChars} characters`);
-        }
-        
-        // Schedule the next character with variable timing
-        const timer = setTimeout(addNextChar, getTypingInterval() + extraDelay);
-        timers.push(timer);
-      } else {
-        // Typing complete
-        console.log('Typing effect complete');
-        setIsTyping(false);
-      }
-    };
-    
-    // Start the typing effect based on audio play state
-    // Use a longer delay to account for ElevenLabs initialization time
-    // This helps ensure typing starts after audio begins playing
-    const typingDelay = 1200; // Increased delay to better match ElevenLabs audio start
-    console.log("Setting up typing effect with delay:", typingDelay);
-    const initialTimer = setTimeout(addNextChar, typingDelay);
-    timers.push(initialTimer);
-    
-    // Cleanup function to clear all timeouts if component unmounts or question changes
-    return () => {
-      timers.forEach(timer => clearTimeout(timer));
-      setIsTyping(false);
-    };
-  }, [currentQuestion, isSessionStarted, typingSpeed]);
 
   // Start session mutation
   const startSessionMutation = useMutation({
@@ -268,20 +190,10 @@ const SessionLink = () => {
               audio.addEventListener("canplaythrough", () => {
                 console.log("Audio can play through, starting playback");
                 // Start playback
-                audio.play()
-                  .then(() => {
-                    // Log when audio actually starts playing to help debug timing
-                    console.log("Audio playback started successfully - this should be before typing begins");
-                  })
-                  .catch((playError) => {
-                    console.error("Error starting audio playback:", playError);
-                    setIsPlaying(false);
-                  });
-              });
-              
-              // Additional event listener to detect when audio actually begins playing
-              audio.addEventListener("playing", () => {
-                console.log("Audio is now actively playing");
+                audio.play().catch((playError) => {
+                  console.error("Error starting audio playback:", playError);
+                  setIsPlaying(false);
+                });
               });
 
               // Set preload to auto to start loading immediately
@@ -456,23 +368,13 @@ const SessionLink = () => {
                     "Follow-up audio can play through, starting playback",
                   );
                   // Start playback
-                  audio.play()
-                    .then(() => {
-                      // Log when audio actually starts playing to help debug timing
-                      console.log("Follow-up audio playback started successfully - this should be before typing begins");
-                    })
-                    .catch((playError) => {
-                      console.error(
-                        "Error starting follow-up audio playback:",
-                        playError,
-                      );
-                      setIsPlaying(false);
-                    });
-                });
-                
-                // Additional event listener to detect when follow-up audio actually begins playing
-                audio.addEventListener("playing", () => {
-                  console.log("Follow-up audio is now actively playing");
+                  audio.play().catch((playError) => {
+                    console.error(
+                      "Error starting follow-up audio playback:",
+                      playError,
+                    );
+                    setIsPlaying(false);
+                  });
                 });
 
                 // Force audio loading
@@ -524,20 +426,11 @@ const SessionLink = () => {
 
                 fallbackAudio.oncanplaythrough = () => {
                   console.log("Fallback follow-up audio can play through");
-                  fallbackAudio.play()
-                    .then(() => {
-                      console.log("Fallback follow-up audio playback started");
-                    })
-                    .catch((e) => {
-                      console.error("Fallback follow-up play failed:", e);
-                      setIsPlaying(false);
-                    });
+                  fallbackAudio.play().catch((e) => {
+                    console.error("Fallback follow-up play failed:", e);
+                    setIsPlaying(false);
+                  });
                 };
-                
-                // Track when audio is actually playing
-                fallbackAudio.addEventListener("playing", () => {
-                  console.log("Fallback follow-up audio is now actively playing");
-                });
 
                 fallbackAudio.load();
               });
@@ -1097,21 +990,14 @@ const SessionLink = () => {
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0"
-                      onClick={() => speakText(currentQuestion)} // Keep using currentQuestion here as we need complete text for TTS
+                      onClick={() => speakText(currentQuestion)}
                     >
                       <Play className="h-4 w-4 text-blue-600" />
                     </Button>
                   )}
                 </div>
               </div>
-              <div className="text-blue-900 leading-relaxed">
-                <p className="min-h-[3rem]">
-                  {displayedQuestion}
-                  {isTyping && (
-                    <span className="inline-block h-4 w-0.5 bg-blue-600 animate-blink ml-1 align-text-bottom"></span>
-                  )}
-                </p>
-              </div>
+              <p className="text-blue-900">{currentQuestion}</p>
             </div>
 
             {/* Patient response section */}
