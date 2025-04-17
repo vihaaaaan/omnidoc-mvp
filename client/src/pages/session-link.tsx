@@ -167,9 +167,11 @@ const SessionLink = () => {
       }
     };
     
-    // Start the typing effect shortly after audio begins
-    // This allows time for the audio to initialize and buffer
-    const typingDelay = 400; // ms before starting to type
+    // Start the typing effect based on audio play state
+    // Use a longer delay to account for ElevenLabs initialization time
+    // This helps ensure typing starts after audio begins playing
+    const typingDelay = 1200; // Increased delay to better match ElevenLabs audio start
+    console.log("Setting up typing effect with delay:", typingDelay);
     const initialTimer = setTimeout(addNextChar, typingDelay);
     timers.push(initialTimer);
     
@@ -266,10 +268,20 @@ const SessionLink = () => {
               audio.addEventListener("canplaythrough", () => {
                 console.log("Audio can play through, starting playback");
                 // Start playback
-                audio.play().catch((playError) => {
-                  console.error("Error starting audio playback:", playError);
-                  setIsPlaying(false);
-                });
+                audio.play()
+                  .then(() => {
+                    // Log when audio actually starts playing to help debug timing
+                    console.log("Audio playback started successfully - this should be before typing begins");
+                  })
+                  .catch((playError) => {
+                    console.error("Error starting audio playback:", playError);
+                    setIsPlaying(false);
+                  });
+              });
+              
+              // Additional event listener to detect when audio actually begins playing
+              audio.addEventListener("playing", () => {
+                console.log("Audio is now actively playing");
               });
 
               // Set preload to auto to start loading immediately
@@ -444,13 +456,23 @@ const SessionLink = () => {
                     "Follow-up audio can play through, starting playback",
                   );
                   // Start playback
-                  audio.play().catch((playError) => {
-                    console.error(
-                      "Error starting follow-up audio playback:",
-                      playError,
-                    );
-                    setIsPlaying(false);
-                  });
+                  audio.play()
+                    .then(() => {
+                      // Log when audio actually starts playing to help debug timing
+                      console.log("Follow-up audio playback started successfully - this should be before typing begins");
+                    })
+                    .catch((playError) => {
+                      console.error(
+                        "Error starting follow-up audio playback:",
+                        playError,
+                      );
+                      setIsPlaying(false);
+                    });
+                });
+                
+                // Additional event listener to detect when follow-up audio actually begins playing
+                audio.addEventListener("playing", () => {
+                  console.log("Follow-up audio is now actively playing");
                 });
 
                 // Force audio loading
@@ -502,11 +524,20 @@ const SessionLink = () => {
 
                 fallbackAudio.oncanplaythrough = () => {
                   console.log("Fallback follow-up audio can play through");
-                  fallbackAudio.play().catch((e) => {
-                    console.error("Fallback follow-up play failed:", e);
-                    setIsPlaying(false);
-                  });
+                  fallbackAudio.play()
+                    .then(() => {
+                      console.log("Fallback follow-up audio playback started");
+                    })
+                    .catch((e) => {
+                      console.error("Fallback follow-up play failed:", e);
+                      setIsPlaying(false);
+                    });
                 };
+                
+                // Track when audio is actually playing
+                fallbackAudio.addEventListener("playing", () => {
+                  console.log("Fallback follow-up audio is now actively playing");
+                });
 
                 fallbackAudio.load();
               });
