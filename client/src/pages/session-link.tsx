@@ -68,6 +68,12 @@ const SessionLink = () => {
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState("");
+  // State for the typing effect - what's actually displayed to the user
+  const [displayedQuestion, setDisplayedQuestion] = useState("");
+  // For typing effect - track if we're currently animating text
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingSpeed, setTypingSpeed] = useState(30); // ms per character
+  
   const [patientResponse, setPatientResponse] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -103,6 +109,47 @@ const SessionLink = () => {
       console.log("Speech Recognition is available");
     }
   }, []);
+  
+  // Typing effect for OmniDoc's dialogue
+  useEffect(() => {
+    // If there's no question or we're not in an active session, don't do anything
+    if (!currentQuestion || !isSessionStarted) {
+      setDisplayedQuestion("");
+      return;
+    }
+    
+    // Reset the displayed text and start typing
+    setDisplayedQuestion("");
+    setIsTyping(true);
+    
+    let currentIndex = 0;
+    const totalChars = currentQuestion.length;
+    
+    // Function to add the next character
+    const addNextChar = () => {
+      if (currentIndex < totalChars) {
+        setDisplayedQuestion(prev => prev + currentQuestion.charAt(currentIndex));
+        currentIndex++;
+        
+        // Schedule the next character
+        setTimeout(addNextChar, typingSpeed);
+      } else {
+        // Typing complete
+        setIsTyping(false);
+      }
+    };
+    
+    // Start the typing effect shortly after audio begins
+    // This allows time for the audio to initialize and buffer
+    const typingDelay = 400; // ms before starting to type
+    const typingTimer = setTimeout(addNextChar, typingDelay);
+    
+    // Cleanup function to clear the timeout if component unmounts or question changes
+    return () => {
+      clearTimeout(typingTimer);
+      setIsTyping(false);
+    };
+  }, [currentQuestion, isSessionStarted, typingSpeed]);
 
   // Start session mutation
   const startSessionMutation = useMutation({
@@ -997,7 +1044,12 @@ const SessionLink = () => {
                   )}
                 </div>
               </div>
-              <p className="text-blue-900">{currentQuestion}</p>
+              <div className="text-blue-900">
+                <p>{displayedQuestion}</p>
+                {isTyping && (
+                  <span className="inline-block h-4 w-2 bg-blue-600 animate-pulse ml-1"></span>
+                )}
+              </div>
             </div>
 
             {/* Patient response section */}
