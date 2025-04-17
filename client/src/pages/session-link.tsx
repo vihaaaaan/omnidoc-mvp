@@ -72,7 +72,7 @@ const SessionLink = () => {
   const [displayedQuestion, setDisplayedQuestion] = useState("");
   // For typing effect - track if we're currently animating text
   const [isTyping, setIsTyping] = useState(false);
-  const [typingSpeed, setTypingSpeed] = useState(30); // ms per character
+  const [typingSpeed, setTypingSpeed] = useState(25); // ms per character (lower = faster)
   
   const [patientResponse, setPatientResponse] = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -124,17 +124,45 @@ const SessionLink = () => {
     
     let currentIndex = 0;
     const totalChars = currentQuestion.length;
+    let timers: NodeJS.Timeout[] = [];
+    
+    // Calculate a slightly variable typing speed
+    // This makes the typing look more natural
+    const getTypingInterval = () => {
+      // Base typing speed with slight randomness
+      const randomVariation = Math.random() * 15 - 5; // -5 to +10ms variation
+      return Math.max(10, typingSpeed + randomVariation);
+    };
+    
+    // Add slight pauses after punctuation for more natural typing
+    const getPunctuationPause = (char: string) => {
+      if (char === '.') return 300; // longer pause after sentences
+      if (char === ',' || char === ':' || char === ';') return 150; // medium pause after commas
+      if (char === '?' || char === '!') return 250; // pause after questions or exclamations
+      return 0; // no extra pause for other characters
+    };
     
     // Function to add the next character
     const addNextChar = () => {
       if (currentIndex < totalChars) {
-        setDisplayedQuestion(prev => prev + currentQuestion.charAt(currentIndex));
+        const currentChar = currentQuestion.charAt(currentIndex);
+        setDisplayedQuestion(prev => prev + currentChar);
         currentIndex++;
         
-        // Schedule the next character
-        setTimeout(addNextChar, typingSpeed);
+        // Add extra delay after punctuation for more natural timing
+        const extraDelay = getPunctuationPause(currentChar);
+        
+        // Log progress (debugging)
+        if (currentIndex % 20 === 0 || currentIndex === totalChars) {
+          console.log(`Typing effect: ${currentIndex}/${totalChars} characters`);
+        }
+        
+        // Schedule the next character with variable timing
+        const timer = setTimeout(addNextChar, getTypingInterval() + extraDelay);
+        timers.push(timer);
       } else {
         // Typing complete
+        console.log('Typing effect complete');
         setIsTyping(false);
       }
     };
@@ -142,11 +170,12 @@ const SessionLink = () => {
     // Start the typing effect shortly after audio begins
     // This allows time for the audio to initialize and buffer
     const typingDelay = 400; // ms before starting to type
-    const typingTimer = setTimeout(addNextChar, typingDelay);
+    const initialTimer = setTimeout(addNextChar, typingDelay);
+    timers.push(initialTimer);
     
-    // Cleanup function to clear the timeout if component unmounts or question changes
+    // Cleanup function to clear all timeouts if component unmounts or question changes
     return () => {
-      clearTimeout(typingTimer);
+      timers.forEach(timer => clearTimeout(timer));
       setIsTyping(false);
     };
   }, [currentQuestion, isSessionStarted, typingSpeed]);
@@ -1037,18 +1066,20 @@ const SessionLink = () => {
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0"
-                      onClick={() => speakText(currentQuestion)}
+                      onClick={() => speakText(currentQuestion)} // Keep using currentQuestion here as we need complete text for TTS
                     >
                       <Play className="h-4 w-4 text-blue-600" />
                     </Button>
                   )}
                 </div>
               </div>
-              <div className="text-blue-900">
-                <p>{displayedQuestion}</p>
-                {isTyping && (
-                  <span className="inline-block h-4 w-2 bg-blue-600 animate-pulse ml-1"></span>
-                )}
+              <div className="text-blue-900 leading-relaxed">
+                <p className="min-h-[3rem]">
+                  {displayedQuestion}
+                  {isTyping && (
+                    <span className="inline-block h-4 w-0.5 bg-blue-600 animate-blink ml-1 align-text-bottom"></span>
+                  )}
+                </p>
               </div>
             </div>
 
