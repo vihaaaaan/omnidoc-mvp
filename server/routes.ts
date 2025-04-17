@@ -354,6 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ElevenLabs text-to-speech API endpoints
   apiRouter.post("/tts", async (req: Request, res: Response) => {
     try {
+      const requestStartTime = Date.now();
       const { text, voiceId } = req.body;
       
       if (!text || typeof text !== 'string') {
@@ -363,15 +364,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.log(`Direct TTS request for text: "${text.substring(0, 50)}..."`);
+      console.log(`TTS POST request at ${new Date().toISOString()} for text: "${text.substring(0, 50)}..."`);
       
-      // Generate speech using ElevenLabs
-      const audioBuffer = await textToSpeech(text, voiceId);
-      console.log(`Generated audio buffer with size: ${audioBuffer.length} bytes`);
+      // Start generating speech with optimized latency settings
+      const audioBufferPromise = textToSpeech(text, voiceId);
       
-      // Send the audio buffer directly (already a Buffer)
+      // Set up headers early to improve time-to-first-byte
       res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      
+      // Wait for audio generation to complete
+      const audioBuffer = await audioBufferPromise;
+      
+      // Set content length after we have the buffer
+      res.setHeader('Content-Length', audioBuffer.length.toString());
+      
+      // Send the audio buffer directly
       res.send(audioBuffer);
+      
+      const requestEndTime = Date.now();
+      const requestDuration = (requestEndTime - requestStartTime) / 1000;
+      console.log(`Generated audio buffer with size: ${audioBuffer.length} bytes in ${requestDuration.toFixed(2)}s`);
     } catch (error) {
       console.error('Error generating text-to-speech:', error);
       res.status(500).json({ 
@@ -488,13 +505,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Retrieved text from session state: "${text.substring(0, 50)}..."`);
       }
       
-      // Generate speech directly using ElevenLabs
+      // Start generating speech with optimized latency settings
+      const requestStartTime = Date.now();
       console.log('Calling ElevenLabs API to generate speech');
-      const audioBuffer = await textToSpeech(text);
-      console.log(`Received audio buffer of size: ${audioBuffer.length} bytes`);
       
-      // Send the audio buffer directly (already a Buffer)
+      // Set up response headers early to improve time-to-first-byte
       res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      
+      // Generate speech with optimized settings
+      const audioBuffer = await textToSpeech(text);
+      
+      // Set content length after we have the buffer
+      res.setHeader('Content-Length', audioBuffer.length.toString());
+      
+      const requestEndTime = Date.now();
+      const requestDuration = (requestEndTime - requestStartTime) / 1000;
+      console.log(`Generated audio buffer with size: ${audioBuffer.length} bytes in ${requestDuration.toFixed(2)}s`);
+      
+      // Send the audio buffer to client
       console.log('Sending audio buffer to client');
       res.send(audioBuffer);
     } catch (error) {
